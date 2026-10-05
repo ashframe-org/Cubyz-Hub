@@ -1,10 +1,10 @@
 
 const OFFICIAL_MODELS = [
-  { id: "snale", title: "Snale", identifier: "cubyz:snale", glb: "/models-official/snale.glb", texture: "/models-official/snale.png", rotateX: false, rotationOffsetY: Math.PI },
-  { id: "snela", title: "Snela", identifier: "cubyz:snela", glb: "/models-official/snela.glb", texture: "/models-official/snela.png", rotateX: false, rotationOffsetY: Math.PI },
-  { id: "snail", title: "Snail", identifier: "cubyz:snail", glb: "/models-official/snail.glb", texture: "/models-official/snail.png", rotateX: true, rotationOffsetY: 0 },
-  { id: "moffalo", title: "Moffalo", identifier: "cubyz:moffalo", glb: "/models-official/moffalo.glb", texture: "/models-official/moffalo.png", rotateX: true, rotationOffsetY: 0 },
-  { id: "cubert", title: "Cubert", identifier: "cubyz:cubert", glb: "/models-official/cubert.glb", texture: "/models-official/cubert.png", rotateX: true, rotationOffsetY: 0 },
+  { id: "snale", title: "Snale", identifier: "cubyz:snale", glb: "/models-official/snale.glb?v=20261004-1", texture: "/models-official/snale.png", rotateX: false, rotationOffsetY: 0 },
+  { id: "snela", title: "Snela", identifier: "cubyz:snela", glb: "/models-official/snela.glb?v=20261004-1", texture: "/models-official/snela.png", rotateX: false, rotationOffsetY: 0 },
+  { id: "snail", title: "Snail", identifier: "cubyz:snail", glb: "/models-official/snail.glb?v=20261004-1", texture: "/models-official/snail.png", rotateX: false, rotationOffsetY: Math.PI },
+  { id: "moffalo", title: "Moffalo", identifier: "cubyz:moffalo", glb: "/models-official/moffalo.glb?v=20261004-1", texture: "/models-official/moffalo.png", rotateX: false, rotationOffsetY: Math.PI },
+  { id: "cubert", title: "Cubert", identifier: "cubyz:cubert", glb: "/models-official/cubert.glb?v=20261004-1", texture: "/models-official/cubert.png", rotateX: false, rotationOffsetY: 0 },
 ];
 
 function escapeHTML(str) {
@@ -49,6 +49,7 @@ async function loadCurrentUser() {
 const params = new URLSearchParams(window.location.search);
 const remixOfId = params.get("remixOf");
 const editId = params.get("edit");
+const baseId = params.get("base");
 
 
 let parentModelId = null;
@@ -59,6 +60,7 @@ let baseRotateX = false;
 let baseRotationOffsetY = 0;
 let baseTextureUrl = null;
 let customGlbFile = null;
+let customCoordinateSystem = null;
 let isFullCustomModel = false;
 
 
@@ -97,6 +99,7 @@ function renderBaseGrid() {
   OFFICIAL_MODELS.forEach((model) => {
     const card = document.createElement("div");
     card.className = "um-base-card";
+    card.dataset.base = model.id;
     const img = document.createElement("img");
     img.src = model.texture;
     img.alt = model.title;
@@ -142,10 +145,17 @@ customModelNextBtn.addEventListener("click", () => {
     customModelError.hidden = false;
     return;
   }
+  const coordChoice = document.querySelector('input[name="umCoordSystem"]:checked');
+  if (!coordChoice) {
+    customModelError.textContent = "Select the coordinate system (Y up or Z up).";
+    customModelError.hidden = false;
+    return;
+  }
 
   isFullCustomModel = true;
   associatedModel = null;
   customGlbFile = glbFile;
+  customCoordinateSystem = coordChoice.value;
   baseGlbPath = URL.createObjectURL(glbFile);
   baseRotateX = false;
   baseRotationOffsetY = 0;
@@ -169,6 +179,13 @@ let loadedBaseImage = null;
 let undoStack = [];
 const MAX_UNDO_STEPS = 25;
 
+// Selection / clipboard (copy-paste) state.
+let clipboardCanvas = null;
+let selection = null; // { x, y, w, h } in texture pixels
+let selectStart = null;
+let pasteState = null; // { canvas, x, y }
+let pastePos = null; // { x, y } cursor position in texture pixels
+
 let previewScene, previewCamera, previewRenderer, previewMeshInstance, previewThreeTexture;
 let previewAnimId = null;
 
@@ -185,19 +202,48 @@ const undoBtn = document.getElementById("umUndoBtn");
 const resetBtn = document.getElementById("umResetBtn");
 const canvasScrollContainer = document.getElementById("umCanvasScrollContainer");
 const paintAreaContainer = document.getElementById("umPaintAreaContainer");
+const toolEraserBtn = document.getElementById("umToolEraser");
+const toolSelectBtn = document.getElementById("umToolSelect");
+const opacityInput = document.getElementById("umOpacity");
+const opacityValueEl = document.getElementById("umOpacityValue");
+const cloudStatusEl = document.getElementById("umCloudStatus");
+const saveBtn = document.getElementById("umSaveBtn");
+const cloudBtn = document.getElementById("umCloudBtn");
+const cloudOverlay = document.getElementById("umCloudOverlay");
+const cloudList = document.getElementById("umCloudList");
+const cloudCloseBtn = document.getElementById("umCloudClose");
+const brushCursorEl = document.getElementById("umBrushCursor");
+
+function eraseMode() {
+  return activeTool === "eraser" || Number(opacityInput.value) === 0;
+}
 
 function setTool(tool) {
   activeTool = tool;
   toolPaintBtn.classList.toggle("active", tool === "paint");
+  toolEraserBtn.classList.toggle("active", tool === "eraser");
+  toolSelectBtn.classList.toggle("active", tool === "select");
   toolPanBtn.classList.toggle("active", tool === "pan");
   toolEyedropperBtn.classList.toggle("active", tool === "eyedropper");
   if (gridCanvas) {
-    gridCanvas.style.cursor = tool === "pan" ? "grab" : tool === "eyedropper" ? "crosshair" : "crosshair";
+    gridCanvas.style.cursor = tool === "pan" ? "grab" : "crosshair";
   }
+  if (brushCursorEl && tool !== "paint" && tool !== "eraser") brushCursorEl.hidden = true;
 }
 toolPaintBtn.addEventListener("click", () => setTool("paint"));
+toolEraserBtn.addEventListener("click", () => setTool("eraser"));
+toolSelectBtn.addEventListener("click", () => setTool("select"));
 toolPanBtn.addEventListener("click", () => setTool("pan"));
 toolEyedropperBtn.addEventListener("click", () => setTool("eyedropper"));
+
+opacityInput.addEventListener("input", () => {
+  opacityValueEl.textContent = opacityInput.value + "%";
+  if (Number(opacityInput.value) === 0 && activeTool === "paint") {
+    paintStatusEl.textContent = "Opacity 0 - painting erases";
+    paintStatusEl.classList.add("visible");
+    setTimeout(() => paintStatusEl.classList.remove("visible"), 1400);
+  }
+});
 
 function pickColor(e) {
   const rect = gridCanvas.getBoundingClientRect();
@@ -228,9 +274,21 @@ canvasScrollContainer.addEventListener(
 );
 
 window.addEventListener("keydown", (e) => {
-  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "z" && !stepEls[2].classList.contains("hidden")) {
+  const onPaintStep = !stepEls[2].classList.contains("hidden");
+  const mod = e.ctrlKey || e.metaKey;
+  const key = (e.key || "").toLowerCase();
+  if (mod && key === "z" && onPaintStep) {
     e.preventDefault();
     undoPaint();
+  } else if (mod && key === "c" && onPaintStep) {
+    e.preventDefault();
+    copySelection();
+  } else if (mod && key === "v" && onPaintStep) {
+    e.preventDefault();
+    beginPaste();
+  } else if (e.key === "Escape" && onPaintStep) {
+    if (pasteState) cancelPaste();
+    else if (selection) { selection = null; drawOverlays(); }
   }
 });
 
@@ -269,7 +327,7 @@ function applyCanvasZoom(onDone) {
   tempImg.onload = () => {
     paintCtx.clearRect(0, 0, paintCanvas.width, paintCanvas.height);
     paintCtx.drawImage(tempImg, 0, 0);
-    drawGridOverlay();
+    drawOverlays();
     if (onDone) onDone();
   };
 }
@@ -288,16 +346,147 @@ function drawGridOverlay() {
     gridCtx.beginPath(); gridCtx.moveTo(0, y); gridCtx.lineTo(gridCanvas.width, y); gridCtx.stroke();
   }
 }
-showGridToggle.addEventListener("change", drawGridOverlay);
 
-function draw(e) {
+function pixelToDisplay(v) {
+  return v * scaleMultiplier * zoomLevel;
+}
+
+// Grid + selection marquee + paste ghost, all on the overlay canvas.
+function drawOverlays() {
+  if (!gridCtx) return;
+  drawGridOverlay();
+
+  if (selection) {
+    const s = pixelToDisplay(1);
+    gridCtx.save();
+    gridCtx.setLineDash([6, 4]);
+    gridCtx.strokeStyle = "#5BA65B";
+    gridCtx.lineWidth = 1;
+    gridCtx.strokeRect(selection.x * s + 0.5, selection.y * s + 0.5, selection.w * s, selection.h * s);
+    gridCtx.restore();
+  }
+
+  if (pasteState && pastePos) {
+    const s = pixelToDisplay(1);
+    const cw = pasteState.canvas.width;
+    const ch = pasteState.canvas.height;
+    const px = (pastePos.x - Math.floor(cw / 2)) * s;
+    const py = (pastePos.y - Math.floor(ch / 2)) * s;
+    gridCtx.save();
+    gridCtx.imageSmoothingEnabled = false;
+    gridCtx.globalAlpha = 0.85;
+    gridCtx.drawImage(pasteState.canvas, px, py, cw * s, ch * s);
+    gridCtx.globalAlpha = 1;
+    gridCtx.setLineDash([6, 4]);
+    gridCtx.strokeStyle = "#5BA65B";
+    gridCtx.strokeRect(px + 0.5, py + 0.5, cw * s, ch * s);
+    gridCtx.restore();
+  }
+}
+
+function eventToPixel(e) {
   const rect = gridCanvas.getBoundingClientRect();
   const x = Math.floor(((e.clientX - rect.left) / rect.width) * paintCanvas.width);
   const y = Math.floor(((e.clientY - rect.top) / rect.height) * paintCanvas.height);
+  return {
+    x: Math.max(0, Math.min(paintCanvas.width - 1, x)),
+    y: Math.max(0, Math.min(paintCanvas.height - 1, y)),
+  };
+}
 
+let lastBrushPointer = null;
+
+// Square outline following the cursor, sized to the brush in texture pixels,
+// so you can see how big a stroke will be before painting.
+function updateBrushCursor(e) {
+  if (!brushCursorEl || !paintCanvas) return;
+  lastBrushPointer = e;
+  if (activeTool === "pan" || activeTool === "eyedropper" || activeTool === "select" || pasteState) {
+    brushCursorEl.hidden = true;
+    return;
+  }
+  const pt = eventToPixel(e);
   const size = parseInt(brushSizeInput.value, 10) || 1;
-  paintCtx.fillStyle = paintColorInput.value;
-  paintCtx.fillRect(x - Math.floor(size / 2), y - Math.floor(size / 2), size, size);
+  const s = scaleMultiplier * zoomLevel;
+  brushCursorEl.hidden = false;
+  brushCursorEl.style.left = (pt.x - Math.floor(size / 2)) * s + "px";
+  brushCursorEl.style.top = (pt.y - Math.floor(size / 2)) * s + "px";
+  brushCursorEl.style.width = size * s + "px";
+  brushCursorEl.style.height = size * s + "px";
+}
+
+brushSizeInput.addEventListener("input", () => {
+  if (lastBrushPointer && brushCursorEl && !brushCursorEl.hidden) updateBrushCursor(lastBrushPointer);
+});
+
+function copySelection() {
+  if (!paintCanvas) return;
+  const region = selection || { x: 0, y: 0, w: paintCanvas.width, h: paintCanvas.height };
+  if (region.w < 1 || region.h < 1) return;
+  const c = document.createElement("canvas");
+  c.width = region.w;
+  c.height = region.h;
+  c.getContext("2d").drawImage(paintCanvas, region.x, region.y, region.w, region.h, 0, 0, region.w, region.h);
+  clipboardCanvas = c;
+  showPaintStatus("Copied " + region.w + "\u00d7" + region.h + " - Ctrl+V to paste");
+}
+
+function beginPaste() {
+  if (!clipboardCanvas || !paintCanvas) {
+    showPaintStatus("Nothing copied yet - select an area and Ctrl+C first");
+    return;
+  }
+  pasteState = { canvas: clipboardCanvas };
+  if (selection) {
+    pastePos = { x: selection.x + Math.floor(selection.w / 2), y: selection.y + Math.floor(selection.h / 2) };
+  } else {
+    pastePos = { x: Math.floor(paintCanvas.width / 2), y: Math.floor(paintCanvas.height / 2) };
+  }
+  showPaintStatus("Click to place the pasted area - Esc to cancel");
+  drawOverlays();
+}
+
+function cancelPaste() {
+  pasteState = null;
+  pastePos = null;
+  drawOverlays();
+}
+
+function stampPaste(pt) {
+  if (!pasteState) return;
+  saveToUndoStack();
+  const c = pasteState.canvas;
+  paintCtx.drawImage(c, pt.x - Math.floor(c.width / 2), pt.y - Math.floor(c.height / 2));
+  cancelPaste();
+  update3DTextureFrom2DCanvas();
+}
+
+showGridToggle.addEventListener("change", drawOverlays);
+
+function showPaintStatus(text, ms) {
+  if (!paintStatusEl) return;
+  paintStatusEl.classList.add("visible");
+  paintStatusEl.textContent = text;
+  clearTimeout(showPaintStatus._t);
+  showPaintStatus._t = setTimeout(() => paintStatusEl.classList.remove("visible"), ms || 1400);
+}
+
+function draw(e) {
+  const pt = eventToPixel(e);
+  const size = parseInt(brushSizeInput.value, 10) || 1;
+
+  paintCtx.save();
+  if (eraseMode()) {
+    paintCtx.globalCompositeOperation = "destination-out";
+    paintCtx.globalAlpha = 1;
+    paintCtx.fillStyle = "#000";
+  } else {
+    paintCtx.globalCompositeOperation = "source-over";
+    paintCtx.globalAlpha = Math.max(0, Math.min(1, Number(opacityInput.value) / 100));
+    paintCtx.fillStyle = paintColorInput.value;
+  }
+  paintCtx.fillRect(pt.x - Math.floor(size / 2), pt.y - Math.floor(size / 2), size, size);
+  paintCtx.restore();
 
   if (updateTimer) clearTimeout(updateTimer);
 
@@ -416,8 +605,15 @@ function setupPainterCanvas(textureUrl) {
       panStartY = e.clientY;
       scrollStartX = canvasScrollContainer.scrollLeft;
       scrollStartY = canvasScrollContainer.scrollTop;
+    } else if (pasteState) {
+      stampPaste(eventToPixel(e));
     } else if (activeTool === "eyedropper") {
       pickColor(e);
+    } else if (activeTool === "select") {
+      const pt = eventToPixel(e);
+      selectStart = pt;
+      selection = { x: pt.x, y: pt.y, w: 0, h: 0 };
+      drawOverlays();
     } else {
       isPainting = true;
       saveToUndoStack();
@@ -426,10 +622,29 @@ function setupPainterCanvas(textureUrl) {
   };
 
   gridCanvas.onmousemove = (e) => {
+    updateBrushCursor(e);
     if (activeTool === "pan" && isDragging) {
       canvasScrollContainer.scrollLeft = scrollStartX - (e.clientX - panStartX);
       canvasScrollContainer.scrollTop = scrollStartY - (e.clientY - panStartY);
-    } else if (activeTool === "paint" && isPainting) {
+      return;
+    }
+    if (pasteState) {
+      pastePos = eventToPixel(e);
+      drawOverlays();
+      return;
+    }
+    if (activeTool === "select" && selectStart) {
+      const pt = eventToPixel(e);
+      selection = {
+        x: Math.min(selectStart.x, pt.x),
+        y: Math.min(selectStart.y, pt.y),
+        w: Math.abs(pt.x - selectStart.x) + 1,
+        h: Math.abs(pt.y - selectStart.y) + 1,
+      };
+      drawOverlays();
+      return;
+    }
+    if (activeTool === "paint" && isPainting) {
       draw(e);
     }
   };
@@ -437,8 +652,13 @@ function setupPainterCanvas(textureUrl) {
   window.addEventListener("mouseup", () => {
     isPainting = false;
     isDragging = false;
+    selectStart = null;
     if (activeTool === "pan" && gridCanvas) gridCanvas.style.cursor = "grab";
   });
+
+  gridCanvas.onmouseleave = () => {
+    if (brushCursorEl) brushCursorEl.hidden = true;
+  };
 }
 
 let previewPivot = null;
@@ -451,6 +671,18 @@ let previewLastY = 0;
 
 function setupPreviewViewer() {
   const container = document.getElementById("umPreviewCanvasContainer");
+
+  // Tear down any previous renderer so switching saves doesn't leak contexts.
+  if (previewRenderer) {
+    cancelAnimationFrame(previewAnimId);
+    previewRenderer.dispose();
+    previewRenderer.domElement.remove();
+    previewRenderer = null;
+    previewPivot = null;
+    previewMeshInstance = null;
+    previewThreeTexture = null;
+  }
+
   container.innerHTML = "";
 
   previewScene = new THREE.Scene();
@@ -549,6 +781,11 @@ function initPainter() {
   if (!baseGlbPath || !baseTextureUrl) return;
   painterInitialized = true;
   undoStack = [];
+  selection = null;
+  selectStart = null;
+  pasteState = null;
+  pastePos = null;
+  if (saveBtn) saveBtn.disabled = false;
   setupPainterCanvas(baseTextureUrl);
   requestAnimationFrame(() => {
     setTimeout(() => setupPreviewViewer(), 5);
@@ -569,6 +806,160 @@ const publishBtn = document.getElementById("umPublishBtn");
 const MODEL_TITLE_MAX_LENGTH = 80;
 const MODEL_TITLE_PATTERN = /^[\p{L}\p{N} .,'"!?()&:-]+$/u;
 const MODEL_DESCRIPTION_MAX_LENGTH = 500;
+
+/* ---- Cloud saves: manual save + a library of your saved models ---- */
+let cloudSaving = false;
+let savedModelId = null;
+
+function setCloudStatus(text, isError) {
+  if (!cloudStatusEl) return;
+  if (!text) {
+    cloudStatusEl.hidden = true;
+    cloudStatusEl.textContent = "";
+    return;
+  }
+  cloudStatusEl.hidden = false;
+  cloudStatusEl.textContent = text;
+  cloudStatusEl.classList.toggle("error", !!isError);
+}
+
+async function saveToCloud() {
+  if (!currentUser || !paintCanvas || !painterInitialized) return;
+  if (cloudSaving) return;
+  cloudSaving = true;
+  const id = editingModelId || savedModelId;
+  try {
+    setCloudStatus("Saving…");
+    const blob = await new Promise((resolve) => paintCanvas.toBlob(resolve, "image/png"));
+    if (!blob) throw new Error("Couldn't export the texture.");
+    const fd = new FormData();
+    fd.append("title", titleInput.value.trim() || "Untitled skin");
+    fd.append("description", descriptionInput.value.trim());
+    fd.append("texture", blob, "texture.png");
+    let url;
+    if (id) {
+      // Don't touch status: editing a published model must not unpublish it.
+      url = `/api/models/${id}/update`;
+      if (associatedModel) fd.append("associated_model", associatedModel);
+    } else {
+      url = "/api/models/upload";
+      fd.append("status", "draft");
+      fd.append("asset_type", isFullCustomModel ? "full_model" : "skin_only");
+      if (associatedModel) fd.append("associated_model", associatedModel);
+      if (parentModelId) fd.append("parent_model_id", String(parentModelId));
+      if (isFullCustomModel && customGlbFile) fd.append("glb", customGlbFile);
+      if (isFullCustomModel && customCoordinateSystem) fd.append("coordinate_system", customCoordinateSystem);
+    }
+    const res = await fetch(url, { method: "POST", body: fd });
+    const data = await res.json();
+    if (!data.ok) throw new Error(data.error || "Save failed.");
+    if (!id) {
+      savedModelId = data.model.id;
+      editingModelId = data.model.id;
+      try {
+        const u = new URL(window.location.href);
+        u.searchParams.delete("remixOf");
+        u.searchParams.set("edit", String(data.model.id));
+        window.history.replaceState({}, "", u);
+      } catch (_) {
+        /* ignore */
+      }
+    }
+    setCloudStatus("Saved to your account");
+    clearTimeout(saveToCloud._hide);
+    saveToCloud._hide = setTimeout(() => {
+      if (cloudStatusEl && cloudStatusEl.textContent === "Saved to your account") setCloudStatus("");
+    }, 2500);
+  } catch (err) {
+    console.warn("Cloud save failed:", err);
+    setCloudStatus("Cloud save failed", true);
+  } finally {
+    cloudSaving = false;
+  }
+}
+
+function closeCloudPanel() {
+  if (cloudOverlay) cloudOverlay.classList.add("hidden");
+}
+
+async function loadModelIntoEditor(id) {
+  painterInitialized = false;
+  editingModelId = null;
+  savedModelId = null;
+  const ok = await loadEditSource(id);
+  if (ok && saveBtn) saveBtn.disabled = false;
+}
+
+function renderCloudList(models) {
+  if (!cloudList) return;
+  cloudList.innerHTML = "";
+  if (!models.length) {
+    const p = document.createElement("p");
+    p.className = "um-cloud-empty";
+    p.textContent = "Nothing saved yet. Paint something and press Save.";
+    cloudList.appendChild(p);
+    return;
+  }
+  models.forEach((m) => {
+    const item = document.createElement("button");
+    item.type = "button";
+    item.className = "um-cloud-item";
+
+    const img = document.createElement("img");
+    img.className = "um-cloud-thumb";
+    img.loading = "lazy";
+    img.alt = "";
+    img.src = m.texture_path || "";
+
+    const body = document.createElement("div");
+    body.className = "um-cloud-item-body";
+    const title = document.createElement("span");
+    title.className = "um-cloud-item-title";
+    title.textContent = m.title || "Untitled";
+    const meta = document.createElement("span");
+    meta.className = "um-cloud-item-meta";
+    const when = (m.created_at || "").slice(0, 10);
+    meta.textContent = (m.status === "draft" ? "Draft" : "Published") + (when ? " \u00b7 " + when : "");
+    body.append(title, meta);
+
+    item.append(img, body);
+    item.addEventListener("click", () => {
+      closeCloudPanel();
+      loadModelIntoEditor(m.id);
+    });
+    cloudList.appendChild(item);
+  });
+}
+
+async function openCloudPanel() {
+  if (!cloudOverlay) return;
+  cloudOverlay.classList.remove("hidden");
+  cloudList.innerHTML = '<p class="um-cloud-empty">Loading\u2026</p>';
+  try {
+    const res = await fetch("/api/user/models", { credentials: "include" });
+    const data = await res.json();
+    if (!data.ok) throw new Error(data.error || "Failed to load your saves.");
+    renderCloudList(data.models || []);
+  } catch (err) {
+    cloudList.innerHTML = "";
+    const p = document.createElement("p");
+    p.className = "um-cloud-empty";
+    p.textContent = err.message || "Failed to load your saves.";
+    cloudList.appendChild(p);
+  }
+}
+
+if (saveBtn) saveBtn.addEventListener("click", saveToCloud);
+if (cloudBtn) cloudBtn.addEventListener("click", openCloudPanel);
+if (cloudCloseBtn) cloudCloseBtn.addEventListener("click", closeCloudPanel);
+if (cloudOverlay) {
+  cloudOverlay.addEventListener("click", (e) => {
+    if (e.target === cloudOverlay) closeCloudPanel();
+  });
+}
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape" && cloudOverlay && !cloudOverlay.classList.contains("hidden")) closeCloudPanel();
+});
 
 function validateDetails() {
   const title = titleInput.value.trim();
@@ -606,12 +997,14 @@ async function submitModel(status) {
     let url;
     if (editingModelId) {
       url = `/api/models/${editingModelId}/update`;
+      if (isFullCustomModel && customCoordinateSystem) fd.append("coordinate_system", customCoordinateSystem);
     } else {
       url = "/api/models/upload";
       fd.append("asset_type", isFullCustomModel ? "full_model" : "skin_only");
       if (associatedModel) fd.append("associated_model", associatedModel);
       if (parentModelId) fd.append("parent_model_id", String(parentModelId));
       if (isFullCustomModel && customGlbFile) fd.append("glb", customGlbFile);
+      if (isFullCustomModel && customCoordinateSystem) fd.append("coordinate_system", customCoordinateSystem);
     }
 
     const res = await fetch(url, { method: "POST", body: fd });
@@ -622,7 +1015,16 @@ async function submitModel(status) {
       return;
     }
 
-    window.location.href = "/dashboard.html";
+    // Return the user to what they were doing: a remix goes back to the
+    // source model's viewer, an edit goes back to that model, and a brand-new
+    // upload lands on the dashboard.
+    if (parentModelId) {
+      window.location.href = `/models?model=${encodeURIComponent(parentModelId)}`;
+    } else if (editingModelId) {
+      window.location.href = `/models?model=${encodeURIComponent(editingModelId)}`;
+    } else {
+      window.location.href = "/dashboard";
+    }
   } catch (err) {
     console.error("Save model failed:", err);
     detailsError.textContent = err.message || "Save failed.";
@@ -646,14 +1048,25 @@ async function loadRemixSource(modelId) {
   }
   const model = data.model;
   parentModelId = model.id;
-  isFullCustomModel = false;
   associatedModel = model.associated_model;
   const baseMatch = OFFICIAL_MODELS.find((m) => m.identifier === model.associated_model) || OFFICIAL_MODELS[0];
-  baseGlbPath = baseMatch.glb;
-  baseRotateX = baseMatch.rotateX;
-  baseRotationOffsetY = baseMatch.rotationOffsetY;
   baseTextureUrl = model.texture_path;
   titleInput.value = `${model.title} Remix`;
+
+  // Remixing a custom full model keeps its own mesh (the server reuses the
+  // parent's .glb on upload) instead of falling back to an official base.
+  if (model.asset_type === "full_model" && model.glb_path) {
+    isFullCustomModel = true;
+    customCoordinateSystem = model.coordinate_system || null;
+    baseGlbPath = model.glb_path;
+    baseRotateX = false;
+    baseRotationOffsetY = 0;
+  } else {
+    isFullCustomModel = false;
+    baseGlbPath = baseMatch.glb;
+    baseRotateX = baseMatch.rotateX;
+    baseRotationOffsetY = baseMatch.rotationOffsetY;
+  }
 
   document.getElementById("umStep1Title").textContent = `Remixing "${escapeHTML(model.title)}"`;
   document.getElementById("umStep1Subtitle").textContent = "Starting from this model's current texture. Continue to paint your own version.";
@@ -687,6 +1100,7 @@ async function loadEditSource(modelId) {
     baseGlbPath = model.glb_path;
     baseRotateX = false;
     baseRotationOffsetY = 0;
+    customCoordinateSystem = model.coordinate_system || customCoordinateSystem;
   } else {
     const baseMatch = OFFICIAL_MODELS.find((m) => m.identifier === model.associated_model) || OFFICIAL_MODELS[0];
     baseGlbPath = baseMatch.glb;
@@ -720,5 +1134,12 @@ async function loadEditSource(modelId) {
     await loadEditSource(editId);
   } else if (remixOfId) {
     await loadRemixSource(remixOfId);
+  } else if (baseId) {
+    // Deep link from the models page: pick that official model and jump to paint.
+    const match = OFFICIAL_MODELS.find((m) => m.id === baseId || m.identifier === baseId);
+    if (match) {
+      const cardEl = baseGrid.querySelector(`.um-base-card[data-base="${match.id}"]`);
+      selectOfficialBase(match, cardEl);
+    }
   }
 })();

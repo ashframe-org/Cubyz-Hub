@@ -1,7 +1,7 @@
 import express from "express";
 import path from "path";
 import fs from "fs";
-import { db } from "../db/index.js";
+import { db, withTransaction } from "../db/index.js";
 import { uploadChangelogScreenshots, verifyFiles } from "../services/uploads.js";
 import { createNotification } from "../services/notifications.js";
 
@@ -33,10 +33,10 @@ router.get("/api/changelog", async (req, res) => {
     const rows =
       viewerUsername === CHANGELOG_ADMIN_USERNAME
         ? await db.all(
-            "SELECT id, title, body, author_username, created_at, is_draft, tag, screenshots, sort_order FROM changelog_entries ORDER BY created_at DESC, sort_order DESC LIMIT 50"
+            "SELECT id, title, body, author_username, created_at, is_draft, tag, screenshots, og_image, sort_order FROM changelog_entries ORDER BY created_at DESC, sort_order DESC LIMIT 50"
           )
         : await db.all(
-            "SELECT id, title, body, author_username, created_at, is_draft, tag, screenshots, sort_order FROM changelog_entries WHERE is_draft = 0 ORDER BY created_at DESC, sort_order DESC LIMIT 50"
+            "SELECT id, title, body, author_username, created_at, is_draft, tag, screenshots, og_image, sort_order FROM changelog_entries WHERE is_draft = 0 ORDER BY created_at DESC, sort_order DESC LIMIT 50"
           );
     const entries = rows.map((row) => {
       let screenshots = [];
@@ -221,6 +221,37 @@ router.post(
   }
 );
 
+router.post("/api/admin/changelog/:id/og-image", express.text({ type: "*/*", limit: "8mb" }), async (req, res) => {
+  if (!req.session.user || req.session.user.username !== CHANGELOG_ADMIN_USERNAME) {
+    return res.status(403).json({ ok: false, error: "Not allowed." });
+  }
+  const entryId = parseInt(req.params.id, 10);
+  if (!Number.isInteger(entryId)) {
+    return res.status(400).json({ ok: false, error: "Invalid entry id." });
+  }
+  const dataUrl = typeof req.body === "string" ? req.body.trim() : "";
+  const match = dataUrl.match(/^data:image\/png;base64,([A-Za-z0-9+/=]+)$/);
+  if (!match) return res.status(400).json({ ok: false, error: "Expected a PNG data URL." });
+  const buf = Buffer.from(match[1], "base64");
+  if (buf.length > 8 * 1024 * 1024) {
+    return res.status(400).json({ ok: false, error: "Image too large." });
+  }
+  try {
+    const entry = await db.get("SELECT id FROM changelog_entries WHERE id = ?", [entryId]);
+    if (!entry) return res.status(404).json({ ok: false, error: "Entry not found." });
+    const dir = path.join(process.cwd(), "uploads", "changelog", String(entryId));
+    await fs.promises.mkdir(dir, { recursive: true });
+    const filename = `preview-${Date.now()}.png`;
+    await fs.promises.writeFile(path.join(dir, filename), buf);
+    const url = `/uploads/changelog/${entryId}/${filename}`;
+    await db.run("UPDATE changelog_entries SET og_image = ? WHERE id = ?", [url, entryId]);
+    res.json({ ok: true, og_image: url });
+  } catch (err) {
+    console.error("SET CHANGELOG OG IMAGE ERROR:", err);
+    res.status(500).json({ ok: false, error: "Failed to save preview image." });
+  }
+});
+
 router.post("/api/admin/changelog/:id/screenshots/remove", express.json(), async (req, res) => {
   if (!req.session.user || req.session.user.username !== CHANGELOG_ADMIN_USERNAME) {
     return res.status(403).json({ ok: false, error: "Not allowed." });
@@ -338,8 +369,10 @@ router.post("/api/admin/changelog/:id/reorder", express.json(), async (req, res)
       return res.status(400).json({ ok: false, error: `Already at the ${direction === "up" ? "top" : "bottom"} for this date.` });
     }
 
-    await db.run("UPDATE changelog_entries SET sort_order = ? WHERE id = ?", [neighbor.sort_order, entryId]);
-    await db.run("UPDATE changelog_entries SET sort_order = ? WHERE id = ?", [entry.sort_order, neighbor.id]);
+    await withTransaction(async () => {
+      await db.run("UPDATE changelog_entries SET sort_order = ? WHERE id = ?", [neighbor.sort_order, entryId]);
+      await db.run("UPDATE changelog_entries SET sort_order = ? WHERE id = ?", [entry.sort_order, neighbor.id]);
+    });
 
     res.json({ ok: true });
   } catch (err) {

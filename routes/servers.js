@@ -3,10 +3,11 @@ import path from "path";
 import fs from "fs";
 import bcrypt from "bcrypt";
 import crypto from "crypto";
-import { db } from "../db/index.js";
+import { db, withTransaction } from "../db/index.js";
 import { uploadServerIcon, verifyFiles, resolveLocalFile } from "../services/uploads.js";
 import { isSafeUrl } from "../utils/common.js";
 import { relayThrottleKey, isRelayLocked, recordRelayFailure, clearRelayFailures } from "../utils/throttles.js";
+import { recordMetric } from "../services/metrics.js";
 
 const router = express.Router();
 
@@ -304,34 +305,38 @@ router.post(
       }
       const icon_url = iconFile ? `/uploads/servers/${folder}/${iconFile.filename}` : null;
 
-      const result = await db.run(
-        `INSERT INTO servers (owner_id, name, description, long_description, website_url, chat_url, icon_url, ip, version, gamemodes, languages, requires_mods, connection_method, status)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-        [
-          req.session.user.id,
-          trimmedName,
-          String(description || "").trim() || null,
-          String(long_description || "").trim() || null,
-          String(website_url || "").trim() || null,
-          String(chat_url || "").trim() || null,
-          icon_url,
-          String(ip || "").trim() || null,
-          String(version || "").trim() || null,
-          String(gamemodes || "").trim() || null,
-          String(languages || "").trim() || null,
-          requiresModsValue,
-          String(connection_method || "").trim() || null,
-          resolvedStatus,
-        ]
-      );
+      const result = await withTransaction(async () => {
+        const inserted = await db.run(
+          `INSERT INTO servers (owner_id, name, description, long_description, website_url, chat_url, icon_url, ip, version, gamemodes, languages, requires_mods, connection_method, status)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          [
+            req.session.user.id,
+            trimmedName,
+            String(description || "").trim() || null,
+            String(long_description || "").trim() || null,
+            String(website_url || "").trim() || null,
+            String(chat_url || "").trim() || null,
+            icon_url,
+            String(ip || "").trim() || null,
+            String(version || "").trim() || null,
+            String(gamemodes || "").trim() || null,
+            String(languages || "").trim() || null,
+            requiresModsValue,
+            String(connection_method || "").trim() || null,
+            resolvedStatus,
+          ]
+        );
 
-      if (requiredMods.ids) await setServerRequiredMods(result.lastID, requiredMods.ids);
+        if (requiredMods.ids) await setServerRequiredMods(inserted.lastID, requiredMods.ids);
+        return inserted;
+      });
 
       const server = await db.get(
         `SELECT servers.*, users.username AS owner_username FROM servers JOIN users ON servers.owner_id = users.id WHERE servers.id = ?`,
         result.lastID
       );
       server.required_mods = await getServerRequiredMods(result.lastID);
+      recordMetric("new_servers");
       res.json({ ok: true, server });
     } catch (err) {
       console.error("CREATE SERVER ERROR:", err);
@@ -413,7 +418,7 @@ router.post(
       res.json({ ok: true, server: updated });
     } catch (err) {
       console.error("UPDATE SERVER ERROR:", err);
-      res.status(500).json({ ok: false, error: err.message || "Failed to update server." });
+      res.status(500).json({ ok: false, error: "Failed to update server." });
     }
   }
 );
@@ -425,8 +430,12 @@ router.delete("/api/servers/:id", async (req, res) => {
     if (!server) return res.status(404).json({ ok: false, error: "Server not found." });
     if (server.owner_id !== req.session.user.id) return res.status(403).json({ ok: false, error: "Not your server." });
 
-    await db.run("DELETE FROM server_likes WHERE server_id = ?", server.id);
-    await db.run("DELETE FROM servers WHERE id = ?", server.id);
+    await withTransaction(async () => {
+      await db.run("DELETE FROM server_likes WHERE server_id = ?", server.id);
+      await db.run("DELETE FROM server_api_tokens WHERE server_id = ?", server.id);
+      await db.run("DELETE FROM server_required_mods WHERE server_id = ?", server.id);
+      await db.run("DELETE FROM servers WHERE id = ?", server.id);
+    });
 
     if (server.icon_url) {
       const probe = resolveLocalFile(server.icon_url);
@@ -476,6 +485,7 @@ router.post("/api/servers/:id/like", async (req, res) => {
     }
 
     const countRow = await db.get("SELECT COUNT(*) AS count FROM server_likes WHERE server_id = ?", [serverId]);
+    if (liked) recordMetric("likes");
     res.json({ ok: true, liked, likes: countRow?.count || 0 });
   } catch (err) {
     console.error("SERVER LIKE ERROR:", err);

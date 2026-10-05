@@ -28,6 +28,8 @@ function attachMarkdownEditor(container, { getValue, onSave, placeholder, render
       const end = textarea.selectionEnd;
       const value = textarea.value;
       const selected = value.slice(start, end);
+      // Only format highlighted text — no placeholder insertion.
+      if (!selected) return;
 
       const innerWrapped = selected.startsWith(before) && selected.endsWith(after) && selected.length >= before.length + after.length;
       const outerStart = start - before.length;
@@ -85,56 +87,61 @@ function attachMarkdownEditor(container, { getValue, onSave, placeholder, render
       }
     }
 
-    const buttons = [
-      { label: "B", title: "Bold", className: "md-editor-btn-bold", action: () => wrapSelection("**") },
-      { label: "I", title: "Italic", className: "md-editor-btn-italic", action: () => wrapSelection("_") },
-      { label: "H1", title: "Heading 1", action: () => prefixLines("# ") },
-      { label: "H2", title: "Heading 2", action: () => prefixLines("## ") },
-      { label: "H3", title: "Heading 3", action: () => prefixLines("### ") },
-      { label: "• List", title: "Bullet list", action: () => prefixLines("- ") },
-      { label: "1. List", title: "Numbered list", action: () => prefixLines("", true) },
-      {
-        label: "Table",
-        title: "Insert table",
-        action: () => insertAtCursor(
-          "\n| Header 1 | Header 2 |\n| --- | --- |\n| Cell 1 | Cell 2 |\n",
-          3, 8
-        )
-      },
-      {
-        label: "Link",
-        title: "Insert link",
-        action: () => {
-          const start = textarea.selectionStart;
-          const end = textarea.selectionEnd;
-          const selected = textarea.value.slice(start, end) || "link text";
-          const text = `[${selected}](https://)`;
-          textarea.value = textarea.value.slice(0, start) + text + textarea.value.slice(end);
-          const urlStart = start + selected.length + 3;
-          textarea.focus();
-          textarea.setSelectionRange(urlStart, urlStart + 8);
-        }
-      },
-      {
-        label: "Image",
-        title: "Insert image",
-        action: () => insertAtCursor("![alt text](https://)", 12, 8)
-      },
-      {
-        label: "Code",
-        title: "Code block",
-        action: () => {
-          const start = textarea.selectionStart;
-          const end = textarea.selectionEnd;
-          const selected = textarea.value.slice(start, end);
-          if (selected.includes("\n") || !selected) {
-            wrapSelection("```\n", "\n```");
-          } else {
-            wrapSelection("`");
+    const buttons = [];
+    const useForum = typeof window !== "undefined" && window.ForumEditor;
+    if (!useForum) {
+      buttons.push(
+        { label: "B", title: "Bold", className: "md-editor-btn-bold", action: () => wrapSelection("**") },
+        { label: "I", title: "Italic", className: "md-editor-btn-italic", action: () => wrapSelection("_") },
+        { label: "H1", title: "Heading 1", action: () => prefixLines("# ") },
+        { label: "H2", title: "Heading 2", action: () => prefixLines("## ") },
+        { label: "H3", title: "Heading 3", action: () => prefixLines("### ") },
+        { label: "• List", title: "Bullet list", action: () => prefixLines("- ") },
+        { label: "1. List", title: "Numbered list", action: () => prefixLines("", true) },
+        {
+          label: "Table",
+          title: "Insert table",
+          action: () => insertAtCursor(
+            "\n| Header 1 | Header 2 |\n| --- | --- |\n| Cell 1 | Cell 2 |\n",
+            3, 8
+          )
+        },
+        {
+          label: "Link",
+          title: "Insert link",
+          action: () => {
+            const start = textarea.selectionStart;
+            const end = textarea.selectionEnd;
+            const selected = textarea.value.slice(start, end);
+            if (!selected) return;
+            const text = `[${selected}](https://)`;
+            textarea.value = textarea.value.slice(0, start) + text + textarea.value.slice(end);
+            const urlStart = start + selected.length + 3;
+            textarea.focus();
+            textarea.setSelectionRange(urlStart, urlStart + 8);
+          }
+        },
+        {
+          label: "Image",
+          title: "Insert image",
+          action: () => insertAtCursor("![alt text](https://)", 12, 8)
+        },
+        {
+          label: "Code",
+          title: "Code block",
+          action: () => {
+            const start = textarea.selectionStart;
+            const end = textarea.selectionEnd;
+            const selected = textarea.value.slice(start, end);
+            if (selected.includes("\n") || !selected) {
+              wrapSelection("```\n", "\n```");
+            } else {
+              wrapSelection("`");
+            }
           }
         }
-      }
-    ];
+      );
+    }
 
     buttons.forEach(({ label, title, className, action }) => {
       const btn = document.createElement("button");
@@ -224,6 +231,17 @@ function attachMarkdownEditor(container, { getValue, onSave, placeholder, render
     wrap.append(tabs, toolbar, textarea, preview, actions);
     container.innerHTML = "";
     container.appendChild(wrap);
+
+    // Use the shared forum editor (image upload, [[addon]] + @mention
+    // autocomplete, galleries, video embeds) when it's available.
+    if (useForum) {
+      toolbar.innerHTML = "";
+      window.ForumEditor.attach(textarea, toolbar, {
+        onError: (message) => {
+          if (window.toast && typeof window.toast.error === "function") window.toast.error(message);
+        },
+      });
+    }
 
     const autoGrow = () => {
       textarea.style.height = "auto";

@@ -1,0 +1,271 @@
+.metrics-main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 18px;
+  max-width: 1100px;
+  margin: 0 auto;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.metrics-hero h2 {
+  margin: 0 0 4px;
+  font-size: 1.4rem;
+}
+
+.metrics-hero .muted {
+  margin: 0;
+  font-size: 0.95rem;
+}
+
+.metrics-live,
+.metrics-totals {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 12px;
+}
+
+.metric-card {
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.metric-card .metric-label {
+  color: var(--text-muted);
+  font-size: 0.82rem;
+  letter-spacing: 0.02em;
+}
+
+.metric-card .metric-value {
+  font-size: 1.6rem;
+  font-weight: 700;
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+}
+
+.metric-card .metric-sub {
+  color: var(--text-muted);
+  font-size: 0.78rem;
+}
+
+.metric-card.live .metric-value::before {
+  content: "";
+  display: inline-block;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: #4dd4ac;
+  margin-right: 8px;
+  box-shadow: 0 0 0 3px rgba(77, 212, 172, 0.18);
+  vertical-align: middle;
+}
+
+.metrics-chart-card {
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px;
+}
+
+.metrics-chart-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+
+.metrics-chart-head h3 {
+  margin: 0;
+  font-size: 1.05rem;
+}
+
+.metrics-range,
+.metrics-metric-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.metrics-metric-tabs {
+  margin-bottom: 12px;
+}
+
+.metrics-range button,
+.metrics-metric-tabs button {
+  cursor: pointer;
+  border: 1px solid var(--border);
+  background: var(--bg-alt);
+  color: var(--text-muted);
+  border-radius: 999px;
+  padding: 5px 12px;
+  font-size: 0.82rem;
+  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+
+.metrics-range button:hover,
+.metrics-metric-tabs button:hover {
+  color: var(--text);
+}
+
+.metrics-range button.active,
+.metrics-metric-tabs button.active {
+  background: var(--accent-soft, rgba(224, 93, 93, 0.15));
+  border-color: var(--accent-border, rgba(224, 93, 93, 0.4));
+  color: var(--text);
+}
+
+.metrics-chart-wrap {
+  width: 100%;
+  overflow: hidden;
+}
+
+.metrics-chart-wrap svg {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+
+.metrics-grid-line {
+  stroke: var(--border);
+  stroke-width: 1;
+}
+
+.metrics-axis-label {
+  fill: var(--text-muted);
+  font-size: 11px;
+  font-family: inherit;
+}
+
+.metrics-area {
+  opacity: 0.16;
+}
+
+.metrics-line {
+  fill: none;
+  stroke-width: 2;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+
+.metrics-bar {
+  opacity: 0.85;
+}
+
+.metrics-bar:hover,
+.metrics-point:hover {
+  opacity: 1;
+}
+
+.metrics-chart-note {
+  margin: 10px 0 0;
+  color: var(--text-muted);
+  font-size: 0.82rem;
+}
+
+.metrics-disclaimer {
+  font-size: 0.8rem;
+  line-height: 1.5;
+}
+
+@media (max-width: 560px) {
+  .metric-card .metric-value {
+    font-size: 1.3rem;
+  }
+}
+
+/* Grouped totals */
+.metrics-totals-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.metric-group {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.metric-group-title {
+  margin: 0;
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--text-muted);
+}
+
+/* Interactive chart tooltip + guide line */
+.metrics-chart-wrap { position: relative; }
+.metrics-guide {
+  stroke: var(--text-muted);
+  stroke-width: 1;
+  stroke-dasharray: 3 3;
+  opacity: 0.65;
+  pointer-events: none;
+}
+.metrics-tooltip {
+  position: absolute;
+  z-index: 6;
+  pointer-events: none;
+  background: var(--panel-bg, #1e1e1e);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 6px 9px;
+  font-size: 12px;
+  line-height: 1.35;
+  color: var(--text);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.45);
+  white-space: nowrap;
+}
+.metrics-tooltip-title {
+  font-weight: 600;
+  margin-bottom: 3px;
+}
+.metrics-tooltip-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text-muted);
+}
+.metrics-tooltip-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+/* Advanced metrics collapsible */
+.metrics-advanced {
+  margin-top: 10px;
+  border-top: 1px solid var(--border);
+  padding-top: 10px;
+}
+.metrics-advanced > summary {
+  cursor: pointer;
+  color: var(--text-muted);
+  font-size: 0.9rem;
+  font-weight: 600;
+  list-style: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  user-select: none;
+}
+.metrics-advanced > summary::-webkit-details-marker { display: none; }
+.metrics-advanced > summary::before {
+  content: "▸";
+  font-size: 0.8em;
+  transition: transform 0.15s ease;
+}
+.metrics-advanced[open] > summary::before { transform: rotate(90deg); }
+.metrics-advanced > summary:hover { color: var(--text); }

@@ -1,16 +1,27 @@
 import sqlite3 from "sqlite3";
 import { open } from "sqlite";
+import { AsyncLocalStorage } from "async_hooks";
 
 export let db;
+// Flips true only after every table/index/migration in initDb() has run.
+// Routes gate on this so a request arriving mid-migration gets a 503
+// instead of a half-initialised schema or a TypeError on an undefined db.
+export let dbReady = false;
 
 export async function initDb() {
   db = await open({
-    filename: "./cubyzhub.db",
+    filename: process.env.DB_PATH || "./cubyzhub.db",
     driver: sqlite3.Database,
   });
 
   await db.exec(`PRAGMA journal_mode = WAL;`);
   await db.exec(`PRAGMA busy_timeout = 5000;`);
+  // Enforce the FOREIGN KEY ... ON DELETE CASCADE clauses declared in the
+  // schema. The app also deletes children explicitly, but this guarantees
+  // no orphaned rows slip through any path that forgets to. It only affects
+  // writes from here on - pre-existing orphan rows are reported below and
+  // are otherwise left untouched.
+  await db.exec(`PRAGMA foreign_keys = ON;`);
 
   setInterval(() => {
     db.exec(`PRAGMA wal_checkpoint(PASSIVE);`).catch((err) => {
@@ -126,6 +137,46 @@ export async function initDb() {
     await db.exec(`ALTER TABLE changelog_entries ADD COLUMN sort_order INTEGER;`);
     await db.exec(`UPDATE changelog_entries SET sort_order = id WHERE sort_order IS NULL;`);
   }
+  if (!changelogColumns.some((col) => col.name === "og_image")) {
+    await db.exec(`ALTER TABLE changelog_entries ADD COLUMN og_image TEXT;`);
+  }
+
+  await db.exec(`
+  CREATE TABLE IF NOT EXISTS github_issues (
+    id INTEGER PRIMARY KEY,
+    repo TEXT NOT NULL,
+    number INTEGER NOT NULL,
+    title TEXT NOT NULL,
+    body TEXT,
+    state TEXT,
+    labels TEXT,
+    author TEXT,
+    html_url TEXT,
+    comments INTEGER DEFAULT 0,
+    is_pr INTEGER DEFAULT 0,
+    github_created_at TEXT,
+    github_updated_at TEXT,
+    fetched_at TEXT DEFAULT CURRENT_TIMESTAMP
+  );
+  CREATE UNIQUE INDEX IF NOT EXISTS idx_github_issues_repo_number ON github_issues(repo, number);
+  CREATE INDEX IF NOT EXISTS idx_github_issues_updated ON github_issues(github_updated_at);
+  CREATE VIRTUAL TABLE IF NOT EXISTS github_issues_fts USING fts5(title, body, id UNINDEXED, repo UNINDEXED, number UNINDEXED);
+  `);
+
+  await db.exec(`
+  CREATE TABLE IF NOT EXISTS feedback (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER,
+    username TEXT,
+    target TEXT NOT NULL,
+    type TEXT NOT NULL,
+    body TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'new',
+    created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE SET NULL
+  );
+  CREATE INDEX IF NOT EXISTS idx_feedback_created ON feedback(created_at);
+  `);
 
   const userColumns = await db.all(`PRAGMA table_info(users);`);
   if (!userColumns.some((col) => col.name === "about")) {
@@ -166,6 +217,9 @@ export async function initDb() {
   }
   if (!userColumns.some((col) => col.name === "activity_visible")) {
     await db.exec(`ALTER TABLE users ADD COLUMN activity_visible INTEGER;`);
+  }
+  if (!userColumns.some((col) => col.name === "forum_visible")) {
+    await db.exec(`ALTER TABLE users ADD COLUMN forum_visible INTEGER DEFAULT 1;`);
   }
 
   const addonColumns = await db.all(`PRAGMA table_info(addons);`);
@@ -275,7 +329,9 @@ export async function initDb() {
   if (!versionColumns.some((col) => col.name === "release_channel")) {
     await db.exec(`ALTER TABLE versions ADD COLUMN release_channel TEXT NOT NULL DEFAULT 'release';`);
   }
-
+  if (!versionColumns.some((col) => col.name === "og_image")) {
+    await db.exec(`ALTER TABLE versions ADD COLUMN og_image TEXT;`);
+  }
   await db.exec(`UPDATE addons SET compatibility = 'UPSTREAM' WHERE compatibility = 'BLEEDING-EDGE';`);
   await db.exec(`UPDATE versions SET compatibility = 'UPSTREAM' WHERE compatibility = 'BLEEDING-EDGE';`);
 
@@ -312,6 +368,16 @@ export async function initDb() {
   }
   if (!modelColumns.some((col) => col.name === "parent_model_id")) {
     await db.exec(`ALTER TABLE models ADD COLUMN parent_model_id INTEGER REFERENCES models(id);`);
+  }
+  if (!modelColumns.some((col) => col.name === "coordinate_system")) {
+    await db.exec(`ALTER TABLE models ADD COLUMN coordinate_system TEXT;`);
+    // Backfill from the associated official base: cubert is right-handed Z-up,
+    // the rest are left-handed Y-up. Custom models default to Z-up.
+    await db.exec(`UPDATE models SET coordinate_system = CASE
+      WHEN associated_model = 'cubyz:cubert' THEN 'right_handed_z_up'
+      WHEN associated_model IN ('cubyz:snale','cubyz:snela','cubyz:snail','cubyz:moffalo') THEN 'left_handed_y_up'
+      ELSE 'right_handed_z_up'
+    END WHERE coordinate_system IS NULL;`);
   }
   await db.exec(`CREATE INDEX IF NOT EXISTS idx_models_parent ON models(parent_model_id);`);
 
@@ -399,6 +465,178 @@ export async function initDb() {
   `);
   await db.exec(`CREATE INDEX IF NOT EXISTS idx_creator_projects_user ON creator_projects(user_id);`);
 
+  // Long-term trend tracking. One tiny row per UTC day for the lifetime of
+  // the site (365 rows/year), plus a per-user-per-day hit table used only to
+  // count unique active users; the latter is pruned old and the unique count
+  // is persisted in metrics_daily.active_users.
+  await db.exec(`
+    CREATE TABLE IF NOT EXISTS metrics_daily (
+      day TEXT PRIMARY KEY,
+      new_users INTEGER NOT NULL DEFAULT 0,
+      logins INTEGER NOT NULL DEFAULT 0,
+      active_users INTEGER NOT NULL DEFAULT 0,
+      downloads INTEGER NOT NULL DEFAULT 0,
+      uploads INTEGER NOT NULL DEFAULT 0,
+      comments INTEGER NOT NULL DEFAULT 0,
+      likes INTEGER NOT NULL DEFAULT 0,
+      new_servers INTEGER NOT NULL DEFAULT 0,
+      creator_saves INTEGER NOT NULL DEFAULT 0,
+      peak_online INTEGER NOT NULL DEFAULT 0,
+      updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+    );
+  `);
+  await db.exec(`
+    CREATE TABLE IF NOT EXISTS metrics_active (
+      day TEXT NOT NULL,
+      user_id INTEGER NOT NULL,
+      PRIMARY KEY (day, user_id)
+    );
+  `);
+  const metricCols = await db.all(`PRAGMA table_info(metrics_daily);`);
+  if (!metricCols.some((col) => col.name === "forum_threads")) {
+    await db.exec(`ALTER TABLE metrics_daily ADD COLUMN forum_threads INTEGER NOT NULL DEFAULT 0;`);
+  }
+  if (!metricCols.some((col) => col.name === "forum_replies")) {
+    await db.exec(`ALTER TABLE metrics_daily ADD COLUMN forum_replies INTEGER NOT NULL DEFAULT 0;`);
+  }
+  await db.exec(`CREATE INDEX IF NOT EXISTS idx_metrics_active_day ON metrics_active(day);`);
+  // metrics_active only needs to exist long enough to compute the unique
+  // daily count (already stored in metrics_daily.active_users); keep ~120
+  // days so 30/90-day unique queries stay accurate, then drop the rows.
+  await db.exec(`DELETE FROM metrics_active WHERE day < date('now', '-120 days');`);
+
+  await db.exec(`
+    CREATE TABLE IF NOT EXISTS forum_threads (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      author_id INTEGER NOT NULL,
+      category TEXT NOT NULL,
+      title TEXT NOT NULL,
+      body TEXT NOT NULL,
+      tags TEXT,
+      status TEXT NOT NULL DEFAULT 'open',
+      pinned INTEGER NOT NULL DEFAULT 0,
+      views INTEGER NOT NULL DEFAULT 0,
+      votes INTEGER NOT NULL DEFAULT 0,
+      reply_count INTEGER NOT NULL DEFAULT 0,
+      created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+      updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
+      last_activity_at TEXT DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY(author_id) REFERENCES users(id) ON DELETE CASCADE
+    );
+  `);
+  await db.exec(`
+    CREATE TABLE IF NOT EXISTS forum_posts (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      thread_id INTEGER NOT NULL,
+      author_id INTEGER NOT NULL,
+      body TEXT NOT NULL,
+      created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY(thread_id) REFERENCES forum_threads(id) ON DELETE CASCADE,
+      FOREIGN KEY(author_id) REFERENCES users(id) ON DELETE CASCADE
+    );
+  `);
+  await db.exec(`CREATE INDEX IF NOT EXISTS idx_forum_threads_category ON forum_threads(category, last_activity_at);`);
+  await db.exec(`CREATE INDEX IF NOT EXISTS idx_forum_threads_author ON forum_threads(author_id);`);
+  await db.exec(`CREATE INDEX IF NOT EXISTS idx_forum_posts_thread ON forum_posts(thread_id, created_at);`);
+  const forumThreadCols = await db.all(`PRAGMA table_info(forum_threads);`);
+  if (!forumThreadCols.some((col) => col.name === "type")) {
+    await db.exec(`ALTER TABLE forum_threads ADD COLUMN type TEXT NOT NULL DEFAULT 'discussion';`);
+  }
+  if (!forumThreadCols.some((col) => col.name === "edited_at")) {
+    await db.exec(`ALTER TABLE forum_threads ADD COLUMN edited_at TEXT;`);
+  }
+  if (!forumThreadCols.some((col) => col.name === "accepted_post_id")) {
+    await db.exec(`ALTER TABLE forum_threads ADD COLUMN accepted_post_id INTEGER;`);
+  }
+  if (!forumThreadCols.some((col) => col.name === "locked")) {
+    await db.exec(`ALTER TABLE forum_threads ADD COLUMN locked INTEGER NOT NULL DEFAULT 0;`);
+  }
+  if (!forumThreadCols.some((col) => col.name === "hidden")) {
+    await db.exec(`ALTER TABLE forum_threads ADD COLUMN hidden INTEGER NOT NULL DEFAULT 0;`);
+  }
+  if (!forumThreadCols.some((col) => col.name === "pinned_at")) {
+    await db.exec(`ALTER TABLE forum_threads ADD COLUMN pinned_at TEXT;`);
+    // Existing pinned threads keep their place by creation time.
+    await db.exec(`UPDATE forum_threads SET pinned_at = created_at WHERE pinned = 1 AND pinned_at IS NULL;`);
+  }
+  const forumPostCols = await db.all(`PRAGMA table_info(forum_posts);`);
+  if (!forumPostCols.some((col) => col.name === "edited_at")) {
+    await db.exec(`ALTER TABLE forum_posts ADD COLUMN edited_at TEXT;`);
+  }
+  if (!forumPostCols.some((col) => col.name === "votes")) {
+    await db.exec(`ALTER TABLE forum_posts ADD COLUMN votes INTEGER NOT NULL DEFAULT 0;`);
+  }
+  if (!forumPostCols.some((col) => col.name === "hidden")) {
+    await db.exec(`ALTER TABLE forum_posts ADD COLUMN hidden INTEGER NOT NULL DEFAULT 0;`);
+  }
+  await db.exec(`
+    CREATE TABLE IF NOT EXISTS forum_post_votes (
+      post_id INTEGER NOT NULL,
+      user_id INTEGER NOT NULL,
+      PRIMARY KEY (post_id, user_id),
+      FOREIGN KEY(post_id) REFERENCES forum_posts(id) ON DELETE CASCADE,
+      FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
+    );
+  `);
+  // Limited forum moderators (in addition to the FORUM_ADMIN account). Kept
+  // in a table rather than a users column so the admin can add/remove them at
+  // runtime. Cached in memory by services/forumMods.js for sync checks.
+  await db.exec(`
+    CREATE TABLE IF NOT EXISTS forum_moderators (
+      user_id INTEGER PRIMARY KEY,
+      added_by INTEGER,
+      created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
+    );
+  `);
+  await db.exec(`CREATE UNIQUE INDEX IF NOT EXISTS idx_forum_moderators_user ON forum_moderators(user_id);`);
+  // Full-text search index over thread titles/bodies and post bodies.
+  await db.exec(
+    `CREATE VIRTUAL TABLE IF NOT EXISTS forum_fts USING fts5(title, body, thread_id UNINDEXED, kind UNINDEXED, ref_id UNINDEXED);`
+  );
+  await db.exec(`
+    CREATE TABLE IF NOT EXISTS forum_reports (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      target_type TEXT NOT NULL,
+      target_id INTEGER NOT NULL,
+      reporter_id INTEGER,
+      reason TEXT,
+      status TEXT NOT NULL DEFAULT 'open',
+      created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+      resolved_by INTEGER,
+      resolved_at TEXT
+    );
+  `);
+  const ftsCount = await db.get("SELECT COUNT(*) AS n FROM forum_fts");
+  const threadCount = await db.get("SELECT COUNT(*) AS n FROM forum_threads");
+  if ((ftsCount?.n || 0) === 0 && (threadCount?.n || 0) > 0) {
+    await db.exec(
+      `INSERT INTO forum_fts (title, body, thread_id, kind, ref_id) SELECT title, body, id, 'thread', id FROM forum_threads`
+    );
+    await db.exec(
+      `INSERT INTO forum_fts (title, body, thread_id, kind, ref_id) SELECT '', body, thread_id, 'post', id FROM forum_posts`
+    );
+  }
+  await db.exec(`
+    CREATE TABLE IF NOT EXISTS forum_thread_votes (
+      thread_id INTEGER NOT NULL,
+      user_id INTEGER NOT NULL,
+      PRIMARY KEY (thread_id, user_id),
+      FOREIGN KEY(thread_id) REFERENCES forum_threads(id) ON DELETE CASCADE,
+      FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
+    );
+  `);
+
+  await db.exec(`
+    CREATE TABLE IF NOT EXISTS forum_thread_views (
+      thread_id INTEGER NOT NULL,
+      viewer_key TEXT NOT NULL,
+      viewed_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      PRIMARY KEY (thread_id, viewer_key),
+      FOREIGN KEY(thread_id) REFERENCES forum_threads(id) ON DELETE CASCADE
+    );
+  `);
+
   await db.exec(`CREATE INDEX IF NOT EXISTS idx_addons_author ON addons(author);`);
   await db.exec(`CREATE INDEX IF NOT EXISTS idx_versions_addon ON versions(addon_id);`);
   await db.exec(`CREATE INDEX IF NOT EXISTS idx_comments_addon ON comments(addon_id, parent_id);`);
@@ -408,20 +646,51 @@ export async function initDb() {
     await db.exec(`ALTER TABLE server_api_tokens ADD COLUMN token_prefix TEXT;`);
   }
   await db.exec(`CREATE INDEX IF NOT EXISTS idx_server_tokens_prefix ON server_api_tokens(token_prefix);`);
+
+  try {
+    const fkViolations = await db.all(`PRAGMA foreign_key_check;`);
+    if (fkViolations.length) {
+      console.warn(`[db] ${fkViolations.length} pre-existing foreign-key violation(s) present; not fatal, but worth cleaning up.`);
+    }
+  } catch (err) {
+    console.warn("[db] foreign_key_check failed:", err);
+  }
+
+  dbReady = true;
 }
 
-export async function withTransaction(fn) {
-  await db.exec("BEGIN IMMEDIATE;");
-  try {
-    const result = await fn();
-    await db.exec("COMMIT;");
-    return result;
-  } catch (err) {
-    try {
-      await db.exec("ROLLBACK;");
-    } catch (rollbackErr) {
-      console.error("Transaction rollback failed:", rollbackErr);
-    }
-    throw err;
+// SQLite transactions are issued as explicit BEGIN/COMMIT on a single shared
+// connection, so two overlapping calls would throw "cannot start a
+// transaction within a transaction" (and non-transaction statements could
+// leak into an open transaction). Serialise them through a promise queue.
+// AsyncLocalStorage lets a withTransaction() nested inside another join the
+// outer transaction instead of deadlocking on the queue.
+const txContext = new AsyncLocalStorage();
+let txQueue = Promise.resolve();
+
+export function withTransaction(fn) {
+  if (txContext.getStore()) {
+    return Promise.resolve().then(fn);
   }
+  const run = async () => {
+    await db.exec("BEGIN IMMEDIATE;");
+    try {
+      const result = await txContext.run(true, fn);
+      await db.exec("COMMIT;");
+      return result;
+    } catch (err) {
+      try {
+        await db.exec("ROLLBACK;");
+      } catch (rollbackErr) {
+        console.error("Transaction rollback failed:", rollbackErr);
+      }
+      throw err;
+    }
+  };
+  const result = txQueue.then(run, run);
+  txQueue = result.then(
+    () => {},
+    () => {}
+  );
+  return result;
 }

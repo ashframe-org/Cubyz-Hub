@@ -1,6 +1,9 @@
 
 #serverVersionFilter-wrapper {
-  width: 190px;
+  width: 165px;
+}
+#serverVersionFilter-wrapper .custom-select-trigger {
+  width: 165px;
 }
 
 #serverSortSelect-wrapper .custom-select-trigger,
@@ -24,9 +27,9 @@
 .server-player-filter {
   display: flex;
   align-items: center;
-  gap: 0.4rem;
+  gap: 0.3rem;
   height: 34px;
-  padding: 0 0.6rem;
+  padding: 0 0.5rem;
   background: var(--bg-alt);
   border: 1px solid var(--border);
   border-radius: 8px;
@@ -36,18 +39,19 @@
 .server-player-filter-field {
   display: flex;
   align-items: center;
-  gap: 0.35rem;
+  gap: 0.25rem;
 }
 
 .server-player-filter-field span {
-  font-size: 0.72rem;
+  font-size: 0.68rem;
   color: var(--text-muted);
   text-transform: uppercase;
   letter-spacing: 0.03em;
 }
 
 .server-player-filter-field input {
-  width: 3.5rem;
+  width: 2.1rem;
+  text-align: center;
   background: none;
   border: none;
   color: var(--text);
@@ -331,7 +335,7 @@
 
 .server-detail-columns {
   display: grid;
-  grid-template-columns: 1fr 420px;
+  grid-template-columns: minmax(0, 1fr) 360px;
   gap: 3rem;
   align-items: start;
 }
@@ -509,9 +513,24 @@
 
 #serverName.editable-text,
 #serverDescription.editable-text,
-#serverIp.editable-text,
-#serverLongDescription.editable-text {
+#serverIp.editable-text {
   display: inline-block;
+}
+
+/* The long description (and its editor) should span the whole column. */
+#serverLongDescription.editable-text {
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+#serverLongDescription.md-editor-active {
+  display: block;
+  width: 100%;
+}
+
+#serverLongDescription .md-editor {
+  width: 100%;
 }
 
 .editable-text::after,
@@ -1158,4 +1177,73 @@ a.server-chip {
 #serverDiscordRow.hidden,
 #cubbiePanel.hidden {
   display: none;
+}
+
+/* Servers list: online cards */
+.server-card.is-online {
+  border-left: 3px solid var(--accent);
+}
+
+.server-card.is-online .server-card-icon {
+  border-color: var(--accent-border, rgba(91, 166, 91, 0.4));
+}
+
+/* Server detail: top bar */
+.server-detail-topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 0.9rem;
+}
+
+/* "Add a server" CTA: pinned to the right edge of the filter bar */
+body.servers-page .toolbar {
+  max-width: 1320px;
+}
+body.servers-page .filter-bar {
+  max-width: 1320px;
+  justify-content: flex-start;
+}
+body.servers-page .server-grid {
+  max-width: 1320px;
+}
+body.servers-page .search-wrap {
+  width: 210px;
+}
+body.servers-page .add-server-btn {
+  margin-left: auto;
+  white-space: nowrap;
+}
+
+/* The server editor uses the shared forum editor (forum.css isn't loaded here),
+   so give its toolbar the same look. */
+.md-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-bottom: 6px;
+}
+.md-toolbar button {
+  min-width: 30px;
+  height: 28px;
+  padding: 0 8px;
+  border: 1px solid var(--border);
+  background: var(--bg-alt);
+  color: var(--text-muted);
+  border-radius: 6px;
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.82rem;
+}
+.md-toolbar button:hover {
+  color: var(--text);
+  border-color: var(--accent-border);
+}
+/* Menus the forum editor appends to <body> need the same base styling. */
+.forum-addon-menu.custom-select-list {
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: 0 18px 38px rgba(0, 0, 0, 0.32);
 }

@@ -333,8 +333,13 @@ function makeEditable(el, { value, placeholder, maxLength, multiline, onCommit }
 
 function renderLongDescription(el, text, shortDescEmpty) {
   if (text) {
-    const html = marked.parse(text);
-    el.innerHTML = DOMPurify.sanitize(html, { ADD_TAGS: ["img"], ADD_ATTR: ["src", "alt", "title"] });
+    if (window.ForumMarkdown) {
+      el.innerHTML = window.ForumMarkdown.render(text);
+    } else {
+      const html = marked.parse(text);
+      el.innerHTML = DOMPurify.sanitize(html, { ADD_TAGS: ["img"], ADD_ATTR: ["src", "alt", "title"] });
+    }
+    if (window.ForumGallery) window.ForumGallery.enhance(el);
     el.classList.remove("hidden");
   } else if (isOwnerView) {
     el.innerHTML = '<span class="server-longdesc-placeholder">Click to add a detailed description (Markdown supported)…</span>';
@@ -899,3 +904,21 @@ setupCubbieDownload();
   }
   await loadServer();
 })();
+
+// "Copy link" button in the detail top bar.
+const serverShareBtn = document.getElementById("serverShareBtn");
+if (serverShareBtn) {
+  serverShareBtn.addEventListener("click", () => {
+    const url = window.location.href;
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(url).then(
+        () => {
+          if (typeof window.toast === "function") window.toast.info("Link copied to clipboard.");
+        },
+        () => window.prompt("Copy this link:", url)
+      );
+    } else {
+      window.prompt("Copy this link:", url);
+    }
+  });
+}

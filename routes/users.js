@@ -4,6 +4,8 @@ import { createNotification, getNotificationPrefs, NOTIFICATION_PREF_KEYS } from
 import { shouldNotifyFollowChange } from "../utils/throttles.js";
 import { isSafeUrl } from "../utils/common.js";
 import { ACTIVITY_ONLINE_WINDOW_MS } from "../utils/constants.js";
+import { getUserUsage } from "../services/usage.js";
+import { isModerator, isForumAdmin } from "../services/forumMods.js";
 
 const router = express.Router();
 
@@ -64,7 +66,7 @@ router.get("/api/users/privacy-settings", async (req, res) => {
   if (!req.session.user) return res.status(401).json({ ok: false, error: "Not logged in." });
   try {
     const user = await db.get(
-      "SELECT followers_visibility, following_visibility, activity_visible FROM users WHERE id = ?",
+      "SELECT followers_visibility, following_visibility, activity_visible, forum_visible FROM users WHERE id = ?",
       req.session.user.id
     );
     res.json({
@@ -72,6 +74,7 @@ router.get("/api/users/privacy-settings", async (req, res) => {
       followersVisibility: user?.followers_visibility || "public",
       followingVisibility: user?.following_visibility || "public",
       activityVisible: user?.activity_visible !== 0,
+      forumVisible: user?.forum_visible !== 0,
     });
   } catch (err) {
     res.status(500).json({ ok: false, error: "Failed to load privacy settings." });
@@ -82,11 +85,14 @@ router.get("/api/users/:username", async (req, res) => {
   const username = req.params.username;
   try {
     const user = await db.get(
-      "SELECT id, username, about, avatarUrl, bannerUrl, created_at, social_links, last_seen, activity_visible FROM users WHERE username = ?",
+      "SELECT id, username, about, avatarUrl, bannerUrl, created_at, social_links, last_seen, activity_visible, forum_visible FROM users WHERE username = ?",
       [username]
     );
 
     if (!user) return res.status(404).json({ ok: false, error: "User not found." });
+
+    const isOwner = req.session?.user?.id === user.id;
+    const showForum = isOwner || user.forum_visible !== 0;
 
     const addons = await db.all(
       `SELECT
@@ -138,6 +144,55 @@ router.get("/api/users/:username", async (req, res) => {
       activity.lastSeen = user.last_seen;
     }
 
+    let forumThreads = [];
+    let forumThreadCountRow = { count: 0 };
+    let forumReplyCountRow = { count: 0 };
+    if (showForum) {
+      forumThreads = (
+        await db.all(
+          `SELECT id, title, category, type, status, pinned, votes, reply_count, created_at, last_activity_at
+           FROM forum_threads
+           WHERE author_id = ? AND hidden = 0
+           ORDER BY COALESCE(last_activity_at, created_at) DESC
+           LIMIT 12`,
+          [user.id]
+        )
+      ).map((t) => ({
+        id: t.id,
+        title: t.title,
+        category: t.category,
+        type: t.type || "discussion",
+        solved: t.status === "solved",
+        pinned: !!t.pinned,
+        votes: t.votes || 0,
+        replyCount: t.reply_count || 0,
+        createdAt: t.created_at,
+        lastActivityAt: t.last_activity_at,
+      }));
+      forumThreadCountRow = await db.get(
+        "SELECT COUNT(*) AS count FROM forum_threads WHERE author_id = ? AND hidden = 0",
+        [user.id]
+      );
+      forumReplyCountRow = await db.get(
+        "SELECT COUNT(*) AS count FROM forum_posts p JOIN forum_threads t ON t.id = p.thread_id WHERE p.author_id = ? AND p.hidden = 0 AND t.hidden = 0",
+        [user.id]
+      );
+    }
+
+    const servers = await db.all(
+      `SELECT id, name, description, icon_url, online, player_count, version, created_at
+       FROM servers WHERE owner_id = ? AND status = 'published'
+       ORDER BY created_at DESC LIMIT 24`,
+      [user.id]
+    );
+
+    const likesRow = await db.get(
+      "SELECT COUNT(*) AS count FROM likes l JOIN addons a ON a.id = l.addon_id WHERE a.author = ?",
+      [username]
+    );
+    const modCount = addons.filter((a) => a.type === "mod").length;
+    const addonCount = addons.length - modCount;
+
     res.json({
       ok: true,
       user,
@@ -148,10 +203,20 @@ router.get("/api/users/:username", async (req, res) => {
       activity,
       addons,
       models,
+      servers,
+      forumThreads,
+      forumHidden: !showForum,
+      isForumModerator: isModerator({ id: user.id, username: user.username }),
+      isForumAdmin: isForumAdmin({ username: user.username }),
       stats: {
-        totalAddons: addons.length,
+        totalAddons: addonCount,
+        totalMods: modCount,
         totalModels: models.length,
+        totalServers: servers.length,
+        totalLikes: likesRow?.count || 0,
         totalDownloads: downloadsRow?.downloads || 0,
+        totalForumThreads: forumThreadCountRow?.count || 0,
+        totalForumReplies: forumReplyCountRow?.count || 0,
         location: "Earth"
       },
       followerCount: followerCountRow?.count || 0,
@@ -389,7 +454,7 @@ const FOLLOW_VISIBILITY_VALUES = ["public", "mutual", "private"];
 
 router.post("/api/users/privacy-settings", express.json(), async (req, res) => {
   if (!req.session.user) return res.status(401).json({ ok: false, error: "Not logged in." });
-  const { followersVisibility, followingVisibility, activityVisible } = req.body;
+  const { followersVisibility, followingVisibility, activityVisible, forumVisible } = req.body;
 
   const updates = {};
   if (followersVisibility !== undefined) {
@@ -409,6 +474,12 @@ router.post("/api/users/privacy-settings", express.json(), async (req, res) => {
       return res.status(400).json({ ok: false, error: "Invalid activity visibility." });
     }
     updates.activity_visible = activityVisible ? 1 : 0;
+  }
+  if (forumVisible !== undefined) {
+    if (typeof forumVisible !== "boolean") {
+      return res.status(400).json({ ok: false, error: "Invalid forum visibility." });
+    }
+    updates.forum_visible = forumVisible ? 1 : 0;
   }
   if (!Object.keys(updates).length) return res.status(400).json({ ok: false, error: "No settings provided." });
 
@@ -463,6 +534,46 @@ router.get("/api/user/models", async (req, res) => {
   } catch (err) {
     console.error("Failed to load user models:", err);
     res.json({ ok: false, error: "Failed to load user models." })
+  }
+});
+
+router.get("/api/user/forum", async (req, res) => {
+  try {
+    if (!req.session.user) return res.status(401).json({ ok: false, error: "Not logged in." });
+    const rows = await db.all(
+      `SELECT id, title, category, type, status, pinned, hidden, votes, reply_count, created_at, last_activity_at
+       FROM forum_threads WHERE author_id = ? ORDER BY COALESCE(last_activity_at, created_at) DESC`,
+      [req.session.user.id]
+    );
+    const replyCountRow = await db.get("SELECT COUNT(*) AS count FROM forum_posts WHERE author_id = ?", [req.session.user.id]);
+    const threads = rows.map((t) => ({
+      id: t.id,
+      title: t.title,
+      category: t.category,
+      type: t.type || "discussion",
+      solved: t.status === "solved",
+      pinned: !!t.pinned,
+      hidden: !!t.hidden,
+      votes: t.votes || 0,
+      replyCount: t.reply_count || 0,
+      createdAt: t.created_at,
+      lastActivityAt: t.last_activity_at,
+    }));
+    res.json({ ok: true, threads, replyCount: replyCountRow?.count || 0 });
+  } catch (err) {
+    console.error("Failed to load user forum:", err);
+    res.json({ ok: false, error: "Failed to load your forum posts." });
+  }
+});
+
+router.get("/api/user/usage", async (req, res) => {
+  try {
+    if (!req.session.user) return res.status(401).json({ ok: false, error: "Not logged in." });
+    const usage = await getUserUsage(req.session.user.id, req.session.user.username);
+    res.json({ ok: true, ...usage });
+  } catch (err) {
+    console.error("USAGE STATS ERROR:", err);
+    res.status(500).json({ ok: false, error: "Failed to load usage." });
   }
 });
 

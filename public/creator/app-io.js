@@ -101,8 +101,10 @@ async function importExistingAddon(input) {
         }
 
         const rules = await loadMigrationRulesForImport();
-        const latest = rules.versions.filter((v) => v.released).pop()?.version || "0.3.0";
-        const versionChoices = rules.versions.filter((v) => v.version !== "unreleased" || detectedVersion === "unreleased");
+        const latest = rules.versions.some((v) => v.version === "unreleased")
+            ? "unreleased"
+            : (rules.versions.filter((v) => v.released).pop()?.version || "unreleased");
+        const versionChoices = rules.versions.filter((v) => v.released || v.version === "unreleased");
 
         const sourceVersion = await confirmImportVersions(detectedVersion, latest, versionChoices);
         if (!sourceVersion) return;
@@ -356,7 +358,7 @@ async function importExistingAddon(input) {
                 window.projectData.entities.push({
                     id: `${addonName}:${nameToken}`,
                     height: extractVal(content, 'height', '2.0'),
-                    coordinateSystem: content.includes('.coordinateSystem = .left_handed_y_up') ? '.left_handed_y_up' : '.right_handed_z_up',
+                    coordinateSystem: content.match(/\.coordinateSystem\s*=\s*(\.(?:left|right)_handed_[yz]_up)/)?.[1] || '.right_handed_z_up',
                     model: `${addonName}:${extractVal(content, 'model', '').split(':').pop()}`,
                     defaultTexture: `${addonName}:${extractVal(content, 'defaultTexture', '').split(':').pop()}`,
                     tags: entityTags
@@ -482,6 +484,8 @@ async function importExistingAddon(input) {
 
                             if (attrs.id) {
                                 let structObj = { id: attrs.id, chance: parseFloat(attrs.chance) || 0.05 };
+                                if (attrs.generationMode) structObj.generationMode = attrs.generationMode;
+                                if (attrs.priority !== undefined) structObj.priority = parseFloat(attrs.priority);
                                 if (attrs.id === 'cubyz:simple_tree') {
                                     structObj.log = attrs.log || 'cubyz:oak_log';
                                     structObj.leaves = attrs.leaves || 'cubyz:leaves/oak';
@@ -491,12 +495,12 @@ async function importExistingAddon(input) {
                                 } else if (attrs.id === 'cubyz:simple_vegetation') {
                                     structObj.block = attrs.block || 'cubyz:fern';
                                     structObj.height = parseInt(attrs.height) || 1;
+                                    structObj.height_variation = parseInt(attrs.height_variation) || 0;
                                 } else if (attrs.id === 'cubyz:flower_patch') {
                                     structObj.block = attrs.block || attrs.blocks || 'cubyz:daffodil';
                                     structObj.width = parseInt(attrs.width) || 10;
                                     structObj.variation = parseInt(attrs.variation) || 6;
                                     structObj.density = parseFloat(attrs.density) || 0.3;
-                                    structObj.priority = 0.1;
                                 } else if (attrs.id === 'cubyz:boulder') {
                                     structObj.block = attrs.block || 'cubyz:slate/rough';
                                     structObj.size = parseInt(attrs.size) || 5;
@@ -513,6 +517,12 @@ async function importExistingAddon(input) {
                                 } else if (attrs.id === 'cubyz:sbb') {
                                     structObj.structure = attrs.structure || '';
                                     structObj.placeMode = attrs.placeMode || '.degradable';
+                                } else if (attrs.id === 'cubyz:stalagmite') {
+                                    structObj.block = attrs.block || 'cubyz:stalagmite';
+                                    structObj.size = parseFloat(attrs.size) || 12;
+                                    structObj.size_variation = parseFloat(attrs.size_variation) || 8;
+                                    structObj.baseSlope = parseFloat(attrs.baseSlope) || 4;
+                                    structObj.topSlope = attrs.topSlope !== undefined ? parseFloat(attrs.topSlope) : structObj.baseSlope;
                                 }
                                 parsedStructures.push(structObj);
                             }
@@ -536,21 +546,86 @@ async function importExistingAddon(input) {
                     });
                 }
 
-                let surfaceBlock = "cubyz:grass", subBlock = "cubyz:soil";
+                const tagsMatch = content.match(/\.tags\s*=\s*\.\{\s*([\s\S]*?)\}/);
+                const biomeTags = tagsMatch ? tagsMatch[1].split(',').map(t => t.trim().replace(/^\./, '')).filter(Boolean) : [];
+                const caveLayerTag = biomeTags.find(t => t.endsWith('_layer')) || "";
+
+                const parseGround = (entry) => {
+                    const rangeM = entry.match(/^(\d+)\s+to\s+(\d+)\s+(.+)$/);
+                    if (rangeM) return { block: rangeM[3], min: rangeM[1], max: rangeM[2] };
+                    const countM = entry.match(/^(\d+)\s+(.+)$/);
+                    if (countM) return { block: countM[2], min: countM[1], max: countM[1] };
+                    return { block: entry, min: '', max: '' };
+                };
                 const groundMatch = content.match(/\.ground_structure\s*=\s*\.\{\s*([\s\S]*?)\}/);
-                if (groundMatch) {
-                    const lines = groundMatch[1].split(',').map(l => l.trim().replace(/^"|"$/g, '')).filter(l => l.length > 0);
-                    if (lines[0]) surfaceBlock = lines[0].replace(/^[\d\s]+to[\d\s]+|^\d+\s+/, '');
-                    if (lines[1]) subBlock = lines[1].replace(/^[\d\s]+to[\d\s]+|^\d+\s+/, '');
+                const parsedGround = groundMatch
+                    ? groundMatch[1].split(',').map(l => l.trim().replace(/^"|"$/g, '')).filter(l => l.length > 0).map(parseGround)
+                    : [];
+                const surfaceBlock = parsedGround[0]?.block || "cubyz:grass";
+                const subBlock = parsedGround[1]?.block || "cubyz:soil";
+                const subMin = parsedGround[1]?.min ?? '';
+                const subMax = parsedGround[1]?.max ?? '';
+                const groundLayers = parsedGround.slice(2);
+
+                const parentBiomes = [];
+                {
+                    const pStart = content.indexOf('.parentBiomes');
+                    if (pStart !== -1) {
+                        const rest = content.slice(pStart + '.parentBiomes'.length);
+                        const nextField = rest.search(/\n\s*\.[a-zA-Z]+\s*=/);
+                        const block = nextField === -1 ? rest : rest.slice(0, nextField);
+                        const entryRe = /\.\{\s*([\s\S]*?)\s*\}/g;
+                        let pm;
+                        while ((pm = entryRe.exec(block)) !== null) {
+                            const inner = pm[1];
+                            const rid = inner.match(/\.id\s*=\s*"([^"]+)"/)?.[1];
+                            if (!rid) continue;
+                            parentBiomes.push({
+                                id: rid,
+                                chance: inner.match(/\.chance\s*=\s*([\d.]+)/)?.[1] ?? '',
+                                parentEdgeDistance: inner.match(/\.parentEdgeDistance\s*=\s*([\d.]+)/)?.[1] ?? '',
+                            });
+                        }
+                    }
+                }
+
+                // `.radius` is the single-value form the game prefers; the panel
+                // edits min/max, so fold it in. rawBlocks keeps every top-level
+                // field verbatim so fields the UI does not edit (caveModels,
+                // stripes, transitionBiomes, type, ...) survive import -> export.
+                const radiusVal = extractVal(content, 'radius', '');
+                let minRadiusVal = extractVal(content, 'minRadius', '');
+                let maxRadiusVal = extractVal(content, 'maxRadius', '');
+                if (radiusVal !== '') {
+                    if (minRadiusVal === '') minRadiusVal = radiusVal;
+                    if (maxRadiusVal === '') maxRadiusVal = radiusVal;
+                }
+
+                const rawBlocks = {};
+                {
+                    let curKey = null, curLines = [];
+                    const flushRaw = () => { if (curKey) rawBlocks[curKey] = curLines.join("\n"); };
+                    for (const rawLine of content.split("\n")) {
+                        const line = rawLine.replace(/\r$/, "");
+                        const km = line.match(/^\t\.([A-Za-z_0-9]+)\s*=/);
+                        if (km) { flushRaw(); curKey = km[1]; curLines = [line]; }
+                        else if (curKey) {
+                            if (line.trimEnd() === "}") { flushRaw(); curKey = null; }
+                            else curLines.push(line);
+                        }
+                    }
+                    flushRaw();
                 }
 
                 window.projectData.biomes.push({
                     id: nameToken,
                     subFolder: extractedSubFolder,
+                    rawBlocks,
                     chance: extractVal(content, 'chance', '1.0'),
                     interpolation: extractVal(content, 'interpolation', '.square'),
-                    minRadius: extractVal(content, 'minRadius', '256'),
-                    maxRadius: extractVal(content, 'maxRadius', '320'),
+                    interpolationWeight: extractVal(content, 'interpolationWeight', '1.0'),
+                    minRadius: minRadiusVal || '256',
+                    maxRadius: maxRadiusVal || '320',
                     smoothBeaches: content.includes('.smoothBeaches = true'),
                     minHeight: extractVal(content, 'minHeight', '20'),
                     maxHeight: extractVal(content, 'maxHeight', '40'),
@@ -561,19 +636,26 @@ async function importExistingAddon(input) {
                     mountains: extractVal(content, 'mountains', '0.0'),
                     soilCreep: extractVal(content, 'soilCreep', '1.0'),
                     keepOriginalTerrain: extractVal(content, 'keepOriginalTerrain', '1.0'),
-                    surfaceBlock, subBlock,
+                    rivers: content.includes('.rivers = true'),
+                    maxSubBiomeCount: content.match(/\.maxSubBiomeCount\s*=\s*([\d.]+)/)?.[1] || '',
+                    surfaceBlock, subBlock, subMin, subMax, groundLayers,
                     stoneBlock: extractVal(content, 'stoneBlock', 'cubyz:slate/smooth'),
                     isCave: content.includes('.isCave = true'),
-                    caveLayerTag: content.match(/\.tags\s*=\s*\.\{[^}]*?\.([\w:]*_layer)/)?.[1] || "",
+                    caveLayerTag,
                     caves: extractVal(content, 'caves', '1.0'),
                     caveRadiusFactor: extractVal(content, 'caveRadiusFactor', '1.0'),
+                    caveSmoothness: extractVal(content, 'caveSmoothness', '4.0'),
+                    caveNoiseStrength: extractVal(content, 'caveNoiseStrength', '8.0'),
                     crystals: extractVal(content, 'crystals', '0'),
                     music: extractVal(content, 'music', 'cubyz:sunrise'),
                     fogDensity: extractVal(content, 'fogDensity', '1.5'),
+                    fogLower: extractVal(content, 'fogLower', '100'),
+                    fogHigher: extractVal(content, 'fogHigher', '1000'),
                     isValidPlayerSpawn: !content.includes('.validPlayerSpawn = false') && !content.includes('.isValidPlayerSpawn = false'),
                     skyColorHex: "#75b2ff", fogColorHex: "#e2f2ff",
                     skyColorVector: ".{ 0.46, 0.70, 1.00 }", fogColorVector: ".{ 0.89, 0.95, 1.00 }",
                     properties, structures: parsedStructures,
+                    tags: biomeTags, parentBiomes,
                     climate, humidity, zone, growth, elevationType
                 });
             }

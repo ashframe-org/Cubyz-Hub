@@ -4,8 +4,9 @@ import path from "path";
 import cors from "cors";
 import session from "express-session";
 import SQLiteStoreFactory from "connect-sqlite3";
-import { initDb, db } from "./db/index.js";
+import { initDb, db, dbReady } from "./db/index.js";
 import { securityHeaders } from "./middleware/security.js";
+import { refreshModerators } from "./services/forumMods.js";
 import { activityTracker } from "./middleware/activity.js";
 import modelsRouter from "./routes/models.js";
 import serversRouter from "./routes/servers.js";
@@ -19,6 +20,11 @@ import commentsRouter from "./routes/comments.js";
 import versionsRouter from "./routes/versions.js";
 import notificationsRouter from "./routes/notifications.js";
 import healthRouter from "./routes/health.js";
+import metricsRouter from "./routes/metrics.js";
+import forumRouter from "./routes/forum.js";
+import feedbackRouter from "./routes/feedback.js";
+import { refreshOnlinePeak } from "./services/metrics.js";
+import { maybeRefreshGitHubIssues } from "./services/githubIssues.js";
 
 const app = express();
 app.set("trust proxy", 1);
@@ -36,6 +42,8 @@ function setStaticCacheHeaders(res, filePath) {
     res.setHeader("Cache-Control", `public, max-age=${STATIC_ASSET_MAX_AGE_MS / 1000}, immutable`);
   }
 }
+
+app.get("/dashboard.html", (req, res) => res.redirect(301, "/dashboard"));
 
 app.use(express.static("public", { setHeaders: setStaticCacheHeaders }));
 app.use("/uploads", express.static("uploads", { maxAge: STATIC_ASSET_MAX_AGE_MS, immutable: true }));
@@ -63,6 +71,16 @@ app.use(
 );
 app.use(activityTracker);
 
+// Reject API traffic until initDb() has finished every table/index/
+// migration, so nothing runs against a half-built schema. /health is
+// exempt (it reports its own 503) as are static assets.
+app.use((req, res, next) => {
+  if (!dbReady && req.path.startsWith("/api/")) {
+    return res.status(503).json({ ok: false, error: "Server starting up, try again shortly." });
+  }
+  next();
+});
+
 app.use(modelsRouter);
 app.use(serversRouter);
 app.use(authRouter);
@@ -74,9 +92,22 @@ app.use(creatorRouter);
 app.use(commentsRouter);
 app.use(versionsRouter);
 app.use(notificationsRouter);
+app.use(metricsRouter);
+app.use(forumRouter);
+app.use(feedbackRouter);
 app.use(healthRouter);
 
-initDb();
+initDb()
+  .then(() => {
+    refreshModerators().catch(() => {});
+    refreshOnlinePeak().catch(() => {});
+    setInterval(() => refreshOnlinePeak().catch(() => {}), 2 * 60 * 1000).unref();
+    maybeRefreshGitHubIssues().catch(() => {});
+    setInterval(() => maybeRefreshGitHubIssues().catch(() => {}), 30 * 60 * 1000).unref();
+  })
+  .catch((err) => {
+    console.error("FATAL: database initialisation failed:", err);
+  });
 
 const PORT = process.env.PORT || 3000;
 const server = app.listen(PORT, () => {

@@ -108,6 +108,9 @@ export function enhanceSelect(selectEl, { labelPrefix } = {}) {
   });
 
   selectEl.addEventListener("change", syncLabel);
+  // Let callers refresh the trigger label after programmatically setting the
+  // native select's value (used by the forum filters).
+  selectEl._syncCustomLabel = syncLabel;
 
   syncLabel();
   selectEl.hidden = true;

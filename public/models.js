@@ -2,11 +2,11 @@
 import { enhanceSelect } from './custom-select.js?v=20260919-17';
 
 const OFFICIAL_MODELS = [
-  { id: "snale", title: "Snale", identifier: "cubyz:snale", glb: "/models-official/snale.glb", texture: "/models-official/snale.png", rotateX: false, rotationOffsetY: Math.PI },
-  { id: "snela", title: "Snela", identifier: "cubyz:snela", glb: "/models-official/snela.glb", texture: "/models-official/snela.png", rotateX: false, rotationOffsetY: Math.PI },
-  { id: "snail", title: "Snail", identifier: "cubyz:snail", glb: "/models-official/snail.glb", texture: "/models-official/snail.png", rotateX: true, rotationOffsetY: 0 },
-  { id: "moffalo", title: "Moffalo", identifier: "cubyz:moffalo", glb: "/models-official/moffalo.glb", texture: "/models-official/moffalo.png", rotateX: true, rotationOffsetY: 0 },
-  { id: "cubert", title: "Cubert", identifier: "cubyz:cubert", glb: "/models-official/cubert.glb", texture: "/models-official/cubert.png", rotateX: true, rotationOffsetY: 0 },
+  { id: "snale", title: "Snale", identifier: "cubyz:snale", glb: "/models-official/snale.glb?v=20261004-1", texture: "/models-official/snale.png", rotateX: false, rotationOffsetY: 0 },
+  { id: "snela", title: "Snela", identifier: "cubyz:snela", glb: "/models-official/snela.glb?v=20261004-1", texture: "/models-official/snela.png", rotateX: false, rotationOffsetY: 0 },
+  { id: "snail", title: "Snail", identifier: "cubyz:snail", glb: "/models-official/snail.glb?v=20261004-1", texture: "/models-official/snail.png", rotateX: false, rotationOffsetY: Math.PI },
+  { id: "moffalo", title: "Moffalo", identifier: "cubyz:moffalo", glb: "/models-official/moffalo.glb?v=20261004-1", texture: "/models-official/moffalo.png", rotateX: false, rotationOffsetY: Math.PI },
+  { id: "cubert", title: "Cubert", identifier: "cubyz:cubert", glb: "/models-official/cubert.glb?v=20261004-1", texture: "/models-official/cubert.png", rotateX: false, rotationOffsetY: 0 },
 ];
 
 function safeUrl(value, fallback) {
@@ -22,13 +22,39 @@ function safeUrl(value, fallback) {
   return fallback;
 }
 
+function formatModelDate(value) {
+  if (!value) return "\u2014";
+  const d = new Date(String(value).replace(" ", "T") + "Z");
+  if (isNaN(d.getTime())) return "\u2014";
+  return d.toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" });
+}
+
 let communityViewers = [];
 let officialViewers = [];
+
+// Does the loaded GLB scene already carry a texture of its own?
+function glbHasTexture(model) {
+  let has = false;
+  model.traverse((child) => {
+    if (has || !child.isMesh) return;
+    const mat = child.material;
+    const mats = Array.isArray(mat) ? mat : [mat];
+    if (mats.some((m) => m && m.map)) has = true;
+  });
+  return has;
+}
 
 function disposeViewers(list) {
   list.forEach((v) => {
     if (v.animId) cancelAnimationFrame(v.animId);
     if (v.renderer) {
+      try {
+        if (v.renderer.setAnimationLoop) v.renderer.setAnimationLoop(null);
+      } catch (_) {}
+      try {
+        // Free the WebGL context eagerly - browsers only allow a handful.
+        if (v.renderer.forceContextLoss) v.renderer.forceContextLoss();
+      } catch (_) {}
       v.renderer.dispose();
       if (v.renderer.domElement && v.renderer.domElement.parentNode) {
         v.renderer.domElement.parentNode.removeChild(v.renderer.domElement);
@@ -51,7 +77,7 @@ function stopCommunityViewers() {
   communityViewers = [];
 }
 
-function initThreeViewer(containerId, glbPath, texturePath, shouldRotateX, rotationOffsetY = 0, group = communityViewers) {
+function initThreeViewer(containerId, glbPath, texturePath, shouldRotateX, rotationOffsetY = 0, group = communityViewers, keepEmbeddedTexture = false) {
   const container = document.getElementById(containerId);
   if (!container || !window.THREE) return;
 
@@ -76,10 +102,18 @@ function initThreeViewer(containerId, glbPath, texturePath, shouldRotateX, rotat
   const loader = new THREE.GLTFLoader();
   loader.load(encodeURI(glbPath), (gltf) => {
     const model = gltf.scene;
-    if (shouldRotateX) model.rotation.x = -Math.PI / 2;
-    model.rotation.y = rotationOffsetY;
+    // rotateX models are Z-up: their "turn" axis is local Z, so the yaw offset
+    // must go on Z too (putting it on Y tilts them upside down).
+    if (shouldRotateX) {
+      model.rotation.x = -Math.PI / 2;
+      model.rotation.z = rotationOffsetY;
+    } else {
+      model.rotation.y = rotationOffsetY;
+    }
 
-    if (texturePath) {
+    // Custom full models: keep the texture baked into the GLB when it has one,
+    // otherwise fall back to the uploaded texture (some GLBs ship untextured).
+    if (texturePath && !(keepEmbeddedTexture && glbHasTexture(model))) {
       new THREE.TextureLoader().load(encodeURI(texturePath), (texture) => {
         texture.flipY = false;
         if (THREE.sRGBEncoding) texture.encoding = THREE.sRGBEncoding;
@@ -106,9 +140,14 @@ function initThreeViewer(containerId, glbPath, texturePath, shouldRotateX, rotat
 
     function animate() {
       viewerRecord.animId = requestAnimationFrame(animate);
+      // A lost context (too many contexts / GPU reset) must not crash the page.
+      const ctx = renderer.getContext && renderer.getContext();
+      if (!ctx || (ctx.isContextLost && ctx.isContextLost())) return;
       if (shouldRotateX) model.rotation.z += 0.004;
       else model.rotation.y += 0.004;
-      renderer.render(scene, camera);
+      try {
+        renderer.render(scene, camera);
+      } catch (_) {}
     }
     animate();
   });
@@ -143,7 +182,7 @@ function disposeModalViewer() {
   modalViewer = null;
 }
 
-function initInteractiveViewer(containerId, glbPath, texturePath, shouldRotateX, rotationOffsetY = 0) {
+function initInteractiveViewer(containerId, glbPath, texturePath, shouldRotateX, rotationOffsetY = 0, keepEmbeddedTexture = false) {
   const container = document.getElementById(containerId);
   if (!container || !window.THREE) return;
 
@@ -202,7 +241,7 @@ function initInteractiveViewer(containerId, glbPath, texturePath, shouldRotateX,
     const model = gltf.scene;
     if (shouldRotateX) model.rotation.x = -Math.PI / 2;
 
-    if (texturePath) {
+    if (texturePath && !(keepEmbeddedTexture && glbHasTexture(model))) {
       new THREE.TextureLoader().load(encodeURI(texturePath), (texture) => {
         texture.flipY = false;
         if (THREE.sRGBEncoding) texture.encoding = THREE.sRGBEncoding;
@@ -229,25 +268,42 @@ function initInteractiveViewer(containerId, glbPath, texturePath, shouldRotateX,
 
     function animate() {
       modalViewer.animId = requestAnimationFrame(animate);
+      const ctx = renderer.getContext && renderer.getContext();
+      if (!ctx || (ctx.isContextLost && ctx.isContextLost())) return;
       pivot.rotation.y = yaw;
       pivot.rotation.x = pitch;
       camera.position.set(0, 0.2, distance);
       camera.lookAt(0, 0, 0);
-      renderer.render(scene, camera);
+      try {
+        renderer.render(scene, camera);
+      } catch (_) {}
     }
     animate();
   });
 }
 
-function openModelModal(model, { glbPath, rotationFlag, offsetY }) {
+function openModelModal(model, { glbPath, rotationFlag, offsetY, keepsEmbeddedTexture = false }) {
   const overlay = document.getElementById("modelViewerModal");
   document.getElementById("modelViewerTitle").textContent = model.title;
   document.getElementById("modelViewerSubtitle").textContent =
     model.asset_type === "skin_only"
       ? `Skin for ${OFFICIAL_MODELS.find((m) => m.identifier === model.associated_model)?.title || "Unknown"}`
       : "Custom model";
-  document.getElementById("modelViewerDescription").textContent = model.description || "";
-  document.getElementById("modelViewerDescription").style.display = model.description ? "" : "none";
+  const descEl = document.getElementById("modelViewerDescription");
+  descEl.textContent = model.description || "No description provided.";
+  descEl.classList.toggle("is-empty", !model.description);
+
+  document.getElementById("modelViewerAdded").textContent = formatModelDate(model.created_at);
+
+  const coordsLabel =
+    model.coordinate_system === "right_handed_z_up" ? "Z up"
+      : model.coordinate_system === "left_handed_y_up" || model.coordinate_system === "right_handed_y_up" ? "Y up"
+        : "—";
+  const coordsEl = document.getElementById("modelViewerCoords");
+  if (coordsEl) {
+    coordsEl.textContent = coordsLabel;
+    coordsEl.title = model.coordinate_system || "";
+  }
 
   const authorLink = document.getElementById("modelViewerAuthor");
   authorLink.textContent = model.username;
@@ -287,8 +343,41 @@ function openModelModal(model, { glbPath, rotationFlag, offsetY }) {
   textureLink.href = encodeURI(model.texture_path);
   textureLink.download = `${model.title}.png`;
 
+  // Owners can delete straight from the viewer (the dashboard's Models tab is
+  // easy to miss, and deletion is otherwise only available there).
+  const deleteBtn = document.getElementById("modelViewerDeleteBtn");
+  if (deleteBtn) {
+    const isOwner = currentUsername && model.username === currentUsername;
+    deleteBtn.classList.toggle("hidden", !isOwner);
+    deleteBtn.onclick = async () => {
+      if (!confirm(`Delete "${model.title}"? This can't be undone.`)) return;
+      deleteBtn.disabled = true;
+      try {
+        const res = await fetch(`/api/models/${model.id}`, { method: "DELETE", credentials: "include" });
+        const data = await res.json();
+        if (!data.ok) {
+          deleteBtn.disabled = false;
+          toast.error(data.error || "Failed to delete.");
+          return;
+        }
+        closeModelModal();
+        await loadModels();
+        toast.success("Model deleted.");
+      } catch (err) {
+        console.error("Delete model failed:", err);
+        deleteBtn.disabled = false;
+        toast.error("Failed to delete.");
+      }
+    };
+  }
+
   const remixBtn = document.getElementById("modelViewerRemixBtn");
   remixBtn.href = `/uploadmodel.html?remixOf=${encodeURIComponent(model.id)}`;
+  remixBtn.classList.remove("hidden");
+  remixBtn.onclick = (e) => {
+    e.preventDefault();
+    chooseRemix(model.id);
+  };
 
   loadRemixes(model.id);
 
@@ -296,20 +385,73 @@ function openModelModal(model, { glbPath, rotationFlag, offsetY }) {
   overlay.setAttribute("aria-hidden", "false");
 
   requestAnimationFrame(() => {
-    initInteractiveViewer("modelViewerCanvas", glbPath, model.texture_path, rotationFlag, offsetY);
+    initInteractiveViewer("modelViewerCanvas", glbPath, model.texture_path, rotationFlag, offsetY, keepsEmbeddedTexture);
   });
 }
 
 const remixesSection = document.getElementById("modelViewerRemixesSection");
 const remixesStrip = document.getElementById("modelViewerRemixesStrip");
 
-async function loadRemixes(modelId) {
-  remixesSection.classList.add("hidden");
-  remixesStrip.innerHTML = "";
+async function chooseRemix(modelId) {
+  const go = (url) => { window.location.href = url; };
+  if (!currentUsername) {
+    go(`/uploadmodel.html?remixOf=${encodeURIComponent(modelId)}`);
+    return;
+  }
+
+  let mine = null;
   try {
     const res = await fetch(`/api/models/${modelId}/remixes`);
     const data = await res.json();
-    if (!data.ok || !Array.isArray(data.models) || data.models.length === 0) return;
+    if (data.ok && Array.isArray(data.models)) {
+      mine = data.models.find((m) => String(m.username).toLowerCase() === currentUsername.toLowerCase());
+    }
+  } catch (err) {
+    console.error("Failed to check for an existing remix:", err);
+  }
+
+  if (!mine) {
+    go(`/uploadmodel.html?remixOf=${encodeURIComponent(modelId)}`);
+    return;
+  }
+
+  const editExisting = window.confirm(
+    "You already have a remix of this model.\n\nOK - Edit your existing remix\nCancel - Choose to create another"
+  );
+  if (editExisting) {
+    go(`/uploadmodel.html?edit=${encodeURIComponent(mine.id)}`);
+    return;
+  }
+  if (window.confirm("Create another remix instead?")) {
+    go(`/uploadmodel.html?remixOf=${encodeURIComponent(modelId)}`);
+  }
+}
+
+const remixesLabel = remixesSection ? remixesSection.querySelector(".model-viewer-remixes-label") : null;
+
+function setRemixesEmpty(message) {
+  remixesSection.classList.remove("hidden");
+  remixesStrip.innerHTML = "";
+  if (remixesLabel) remixesLabel.textContent = "Remixes";
+  const empty = document.createElement("p");
+  empty.className = "model-viewer-remixes-empty";
+  empty.textContent = message;
+  remixesStrip.appendChild(empty);
+}
+
+async function loadRemixes(modelId) {
+  remixesSection.classList.remove("hidden");
+  remixesStrip.innerHTML = "";
+  if (remixesLabel) remixesLabel.textContent = "Remixes";
+  try {
+    const res = await fetch(`/api/models/${modelId}/remixes`);
+    const data = await res.json();
+    if (!data.ok || !Array.isArray(data.models) || data.models.length === 0) {
+      setRemixesEmpty("No remixes yet \u2014 be the first to make one.");
+      return;
+    }
+
+    if (remixesLabel) remixesLabel.textContent = `Remixes (${data.models.length})`;
 
     data.models.forEach((remix) => {
       const thumb = document.createElement("button");
@@ -329,11 +471,9 @@ async function loadRemixes(modelId) {
       thumb.addEventListener("click", () => openRemixModel(remix.id));
       remixesStrip.appendChild(thumb);
     });
-
-    remixesSection.classList.remove("hidden");
   } catch (err) {
     console.error("Failed to load remixes:", err);
-    if (typeof window.toast === "function") window.toast.error("Could not load remixes.");
+    setRemixesEmpty("Couldn't load remixes.");
   }
 }
 
@@ -347,15 +487,18 @@ async function openRemixModel(modelId) {
     let glbPath = model.glb_path;
     let rotationFlag = false;
     let offsetY = 0;
+    let keepsEmbeddedTexture = false;
     if (model.asset_type === "skin_only") {
       const baseMatch = OFFICIAL_MODELS.find((m) => m.identifier === model.associated_model) || OFFICIAL_MODELS[0];
       glbPath = baseMatch.glb;
       rotationFlag = baseMatch.rotateX;
       offsetY = baseMatch.rotationOffsetY;
+    } else {
+      keepsEmbeddedTexture = true;
     }
     disposeModalViewer();
     document.getElementById("modelViewerCanvas").innerHTML = "";
-    openModelModal(model, { glbPath, rotationFlag, offsetY });
+    openModelModal(model, { glbPath, rotationFlag, offsetY, keepsEmbeddedTexture });
   } catch (err) {
     console.error("Failed to open remix model:", err);
     if (typeof window.toast === "function") window.toast.error("Could not open that model.");
@@ -385,9 +528,12 @@ const DOM = {
   search: document.getElementById("modelSearchBar"),
   sort: document.getElementById("modelSortSelect"),
   type: document.getElementById("modelTypeSelect"),
+  pagination: document.getElementById("model-pagination"),
 };
 
 let currentUsername = null;
+let currentPage = 1;
+let totalPages = 1;
 
 async function loadCurrentUser() {
   try {
@@ -400,11 +546,14 @@ async function loadCurrentUser() {
 function renderOfficialGrid() {
   DOM.officialGrid.innerHTML = "";
   OFFICIAL_MODELS.forEach((model, idx) => {
-    const card = document.createElement("div");
-    card.className = "model-card";
+    const card = document.createElement("a");
+    card.className = "model-card model-card-clickable";
+    card.href = `/uploadmodel.html?base=${encodeURIComponent(model.id)}`;
+    card.title = `Paint your own version of ${model.title}`;
     card.innerHTML = `
       <div class="model-card-header">
         <span>${escapeHTML(model.title)}</span>
+        <span class="model-card-paint-hint">Paint</span>
       </div>
       <div class="model-canvas-container" id="canvas-official-${idx}"></div>
     `;
@@ -424,6 +573,7 @@ function renderModelCard(model, index) {
   let glbPath = model.glb_path;
   let rotationFlag = false;
   let offsetY = 0;
+  let keepsEmbeddedTexture = false;
   let subtitleHTML = "";
 
   if (model.asset_type === "skin_only") {
@@ -433,13 +583,24 @@ function renderModelCard(model, index) {
     offsetY = baseMatch.rotationOffsetY;
     subtitleHTML = `<span class="model-card-subtitle">Skin for ${escapeHTML(baseMatch.title)}</span>`;
   } else {
+    // Custom full models carry their own texture inside the .glb.
+    keepsEmbeddedTexture = true;
     subtitleHTML = `<span class="model-card-subtitle model-card-subtitle-custom">Custom model</span>`;
   }
+
+  const coordLabel =
+    model.coordinate_system === "right_handed_z_up" ? "Z up"
+      : model.coordinate_system === "left_handed_y_up" || model.coordinate_system === "right_handed_y_up" ? "Y up"
+        : "";
+  const coordChip = coordLabel
+    ? `<span class="model-coord-chip" title="${escapeHTML(model.coordinate_system || "")}">${coordLabel}</span>`
+    : "";
 
   card.innerHTML = `
     <div class="model-card-header model-card-header-stacked">
       <div class="model-card-title-row">
         <span class="model-card-title">${escapeHTML(model.title)}</span>
+        ${coordChip}
       </div>
       ${subtitleHTML}
     </div>
@@ -475,17 +636,18 @@ function renderModelCard(model, index) {
 
   card.querySelector(".model-author-link").addEventListener("click", (e) => e.stopPropagation());
 
-  card.addEventListener("click", () => openModelModal(model, { glbPath, rotationFlag, offsetY }));
+  card.addEventListener("click", () => openModelModal(model, { glbPath, rotationFlag, offsetY, keepsEmbeddedTexture }));
 
   DOM.container.appendChild(card);
   if (glbPath) {
-    initThreeViewer(`canvas-community-${index}`, glbPath, model.texture_path, rotationFlag, offsetY);
+    initThreeViewer(`canvas-community-${index}`, glbPath, model.texture_path, rotationFlag, offsetY, communityViewers, keepsEmbeddedTexture);
   }
 }
 
 async function loadModels() {
   try {
     const params = new URLSearchParams();
+    params.set("page", String(currentPage));
     if (DOM.search.value.trim()) params.set("search", DOM.search.value.trim());
     if (DOM.sort.value) params.set("sort", DOM.sort.value);
     if (DOM.type.value) params.set("type", DOM.type.value);
@@ -494,8 +656,16 @@ async function loadModels() {
     const data = await res.json();
     if (!data.ok) return;
 
+    currentPage = data.page || 1;
+    totalPages = data.totalPages || 1;
+
+    // Dispose the previous page's WebGL contexts before mounting the new ones
+    // (keeps the live total at 5 official + MODEL_PAGE_SIZE community).
     stopCommunityViewers();
     DOM.container.innerHTML = "";
+    const countEl = document.getElementById("modelCount");
+    if (countEl) countEl.textContent = `${data.total ?? data.models.length}`;
+    renderPagination();
     if (!data.models.length) {
       DOM.emptyState.style.display = "";
       return;
@@ -507,13 +677,60 @@ async function loadModels() {
   }
 }
 
+function renderPagination() {
+  const el = DOM.pagination;
+  if (!el) return;
+  if (totalPages <= 1) {
+    el.innerHTML = "";
+    el.hidden = true;
+    return;
+  }
+  el.hidden = false;
+
+  const pageBtn = (page, label, opts = {}) =>
+    `<button type="button" class="page-btn${page === currentPage ? " active" : ""}" data-page="${page}" ${opts.disabled ? "disabled" : ""}>${label}</button>`;
+
+  const parts = [pageBtn(currentPage - 1, "‹ Prev", { disabled: currentPage <= 1 })];
+  const nums = new Set([1, totalPages, currentPage, currentPage - 1, currentPage + 1]);
+  let prev = null;
+  for (let p = 1; p <= totalPages; p++) {
+    if (!nums.has(p)) continue;
+    if (prev !== null && p - prev > 1) parts.push('<span class="page-ellipsis">…</span>');
+    parts.push(pageBtn(p, String(p)));
+    prev = p;
+  }
+  parts.push(pageBtn(currentPage + 1, "Next ›", { disabled: currentPage >= totalPages }));
+  el.innerHTML = parts.join("");
+}
+
+if (DOM.pagination) {
+  DOM.pagination.addEventListener("click", (e) => {
+    const btn = e.target.closest(".page-btn");
+    if (!btn || btn.disabled) return;
+    const page = parseInt(btn.dataset.page, 10);
+    if (!page || page < 1 || page > totalPages || page === currentPage) return;
+    currentPage = page;
+    loadModels();
+    DOM.container.scrollIntoView({ behavior: "smooth", block: "start" });
+  });
+}
+
 let searchDebounce;
 DOM.search.addEventListener("input", () => {
   clearTimeout(searchDebounce);
-  searchDebounce = setTimeout(loadModels, 250);
+  searchDebounce = setTimeout(() => {
+    currentPage = 1;
+    loadModels();
+  }, 250);
 });
-DOM.sort.addEventListener("change", loadModels);
-DOM.type.addEventListener("change", loadModels);
+DOM.sort.addEventListener("change", () => {
+  currentPage = 1;
+  loadModels();
+});
+DOM.type.addEventListener("change", () => {
+  currentPage = 1;
+  loadModels();
+});
 
 enhanceSelect(DOM.sort);
 enhanceSelect(DOM.type);

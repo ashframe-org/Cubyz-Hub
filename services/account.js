@@ -1,6 +1,7 @@
 import path from "path";
 import fs from "fs";
 import { db, withTransaction } from "../db/index.js";
+import { refreshModerators } from "./forumMods.js";
 import { deleteAddonCascade } from "./addons.js";
 import { resolveLocalFile } from "./uploads.js";
 import { parseCreatorsJson } from "../utils/common.js";
@@ -33,7 +34,6 @@ export async function deleteUserAccountData(username, userId) {
       await db.run("DELETE FROM model_votes WHERE model_id = ?", [m.id]);
     }
     await db.run("DELETE FROM model_votes WHERE user_id = ?", [userId]);
-    await db.run("DELETE FROM models WHERE user_id = ?", [userId]);
     if (models.length) {
       const placeholders = models.map(() => "?").join(",");
       await db.run(
@@ -41,6 +41,7 @@ export async function deleteUserAccountData(username, userId) {
         models.map((m) => m.id)
       );
     }
+    await db.run("DELETE FROM models WHERE user_id = ?", [userId]);
   });
   for (const fileUrl of modelFiles) removeItemFolder(fileUrl, "model");
 
@@ -91,4 +92,17 @@ export async function deleteUserAccountData(username, userId) {
       }
     }
   }
+
+  // Forum image uploads live under uploads/forum/<userId>/ and aren't
+  // referenced from a DB column (they're embedded in post bodies), so remove
+  // the user's folder outright.
+  const forumUploadDir = path.join(process.cwd(), "uploads", "forum", String(userId));
+  try {
+    if (fs.existsSync(forumUploadDir)) fs.rmSync(forumUploadDir, { recursive: true, force: true });
+  } catch (err) {
+    console.warn("Failed to delete forum uploads:", forumUploadDir, err);
+  }
+
+  // Drop them from the in-memory moderator cache (the row cascaded away).
+  await refreshModerators();
 }

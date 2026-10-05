@@ -3,6 +3,7 @@ import sanitizeHtml from "sanitize-html";
 import { db } from "../db/index.js";
 import { createNotification } from "../services/notifications.js";
 import { addonLink } from "../utils/common.js";
+import { recordMetric } from "../services/metrics.js";
 
 const router = express.Router();
 
@@ -89,13 +90,14 @@ router.post("/api/comments/:id", async (req, res) => {
       "INSERT INTO comments (addon_id, username, content, parent_id) VALUES (?, ?, ?, ?)",
       [id, username, safeContent, parentId]
     );
+    recordMetric("comments");
     res.json({ ok: true, commentId: result.lastID, parentId });
 
     try {
       const addon = await db.get("SELECT * FROM addons WHERE id = ?", id);
       if (addon) {
         const author = await db.get("SELECT id FROM users WHERE username = ?", addon.author);
-        if (author) {
+        if (author && addon.author !== username) {
           await createNotification({
             userId: author.id,
             type: "addon_commented",

@@ -158,3 +158,24 @@ export function recordSensitiveFailure(key) {
 export function clearSensitiveFailures(key) {
   sensitiveAttempts.delete(key);
 }
+
+// Forum posting rate limit: sliding window per user.
+const FORUM_POST_WINDOW_MS = 5 * 60 * 1000;
+const FORUM_POST_MAX = 10;
+const recentForumPosts = new Map();
+export function allowForumPost(userId) {
+  const now = Date.now();
+  const stamps = (recentForumPosts.get(userId) || []).filter((t) => now - t < FORUM_POST_WINDOW_MS);
+  if (stamps.length >= FORUM_POST_MAX) {
+    recentForumPosts.set(userId, stamps);
+    return false;
+  }
+  stamps.push(now);
+  recentForumPosts.set(userId, stamps);
+  if (recentForumPosts.size > 5000) {
+    for (const [key, list] of recentForumPosts) {
+      if (!list.length || now - list[list.length - 1] > FORUM_POST_WINDOW_MS) recentForumPosts.delete(key);
+    }
+  }
+  return true;
+}

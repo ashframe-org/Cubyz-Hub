@@ -36,6 +36,22 @@
         </div>
     </div>
 
+    <div class="biome-grid-row cols-3" style="margin-bottom: 24px;">
+        <div class="form-group">
+            <label for="bioInterpolationWeight">Interpolation Weight<span class="hint-text">(default 1)</span></label>
+            <input type="number" id="bioInterpolationWeight" placeholder="1.0" step="0.1" min="0">
+        </div>
+        <div class="form-group">
+            <label for="bioMaxSubBiomeCount">Max Sub-biome Count<span class="hint-text">(blank = unlimited)</span></label>
+            <input type="number" id="bioMaxSubBiomeCount" placeholder="unlimited" step="1" min="0">
+        </div>
+        <div class="form-group">
+            <label style="display: flex; align-items: center; gap: 8px; font-weight: normal; margin-top: 28px; cursor: pointer;">
+                <input type="checkbox" id="bioRivers"> Starts Rivers
+            </label>
+        </div>
+    </div>
+
     <div class="biome-dashboard-split" style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-top: 15px;">
         <div style="display: flex; flex-direction: column; gap: 24px;">
             <div class="biome-section-box" style="padding: 20px;">
@@ -93,11 +109,22 @@
                         <input type="text" id="bioSurfaceBlock" placeholder="cubyz:grass" autocomplete="off" onfocus="window.showRecipeDropdown('bioSurfaceDropdown', 'bioSurfaceBlock', 'blocks')" oninput="window.filterDropdown('bioSurfaceBlock', 'bioSurfaceDropdown')">
                         <div id="bioSurfaceDropdown" class="dropdown-options"></div>
                     </div>
-                    <div class="form-group texture-select-wrapper">
-                        <label for="bioSubBlock">Subsurface Layer (Up to 3 deep)</label>
-                        <input type="text" id="bioSubBlock" placeholder="cubyz:soil" autocomplete="off" onfocus="window.showRecipeDropdown('bioSubDropdown', 'bioSubBlock', 'blocks')" oninput="window.filterDropdown('bioSubBlock', 'bioSubDropdown')">
-                        <div id="bioSubDropdown" class="dropdown-options"></div>
+                    <div class="form-group">
+                        <label for="bioSubBlock">Subsurface Layer <span class="hint-text">(depth range)</span></label>
+                        <div style="display: flex; gap: 8px; align-items: center;">
+                            <div class="texture-select-wrapper" style="position: relative; flex: 1;">
+                                <input type="text" id="bioSubBlock" placeholder="cubyz:soil" autocomplete="off" onfocus="window.showRecipeDropdown('bioSubDropdown', 'bioSubBlock', 'blocks')" oninput="window.filterDropdown('bioSubBlock', 'bioSubDropdown')">
+                                <div id="bioSubDropdown" class="dropdown-options"></div>
+                            </div>
+                            <input type="number" id="bioSubMin" placeholder="0" min="0" style="width: 66px; flex-shrink: 0;">
+                            <input type="number" id="bioSubMax" placeholder="3" min="0" style="width: 66px; flex-shrink: 0;">
+                        </div>
                     </div>
+                    <div style="display: flex; justify-content: space-between; align-items: center; border-top: 1px dashed var(--border); padding-top: 12px;">
+                        <span class="prop-title" style="font-size: 13px;">Extra Ground Layers <span class="hint-text">(applied top → bottom, before the stone layer)</span></span>
+                        <button type="button" class="btn-secondary" onclick="window.addGroundLayerRow()" style="background: var(--accent); color: #000; margin: 0; padding: 6px 12px; font-size: 12px; font-weight: bold; height: 30px; border-radius: 4px;">+ Add Layer</button>
+                    </div>
+                    <div id="bioGroundLayers" style="display: flex; flex-direction: column; gap: 10px; min-height: 10px;"></div>
                     <div class="form-group texture-select-wrapper">
                         <label for="bioStoneBlock">Bottom Stone Layer</label>
                         <input type="text" id="bioStoneBlock" placeholder="cubyz:slate/smooth" autocomplete="off" onfocus="window.showRecipeDropdown('bioStoneDropdown', 'bioStoneBlock', 'blocks')" oninput="window.filterDropdown('bioStoneBlock', 'bioStoneDropdown')">
@@ -194,6 +221,16 @@
                         <input type="number" id="bioFogDensity" placeholder="1.5" step="0.1">
                     </div>
                 </div>
+                <div class="biome-grid-row cols-2" style="margin-bottom: 12px; gap: 20px;">
+                    <div class="form-group" style="margin-bottom: 0;">
+                        <label for="bioFogLower">Fog Lower Limit<span class="hint-text">(default 100)</span></label>
+                        <input type="number" id="bioFogLower" placeholder="100" step="1">
+                    </div>
+                    <div class="form-group" style="margin-bottom: 0;">
+                        <label for="bioFogHigher">Fog Upper Limit<span class="hint-text">(default 1000)</span></label>
+                        <input type="number" id="bioFogHigher" placeholder="1000" step="1">
+                    </div>
+                </div>
                 <div class="biome-grid-row cols-3" style="align-items: center; border-top: 1px dashed var(--border); padding-top: 14px; margin-top: 12px;">
                     <div class="form-group" style="margin-bottom: 0;">
                         <label for="bioSkyColor">Sky Tint</label>
@@ -233,6 +270,14 @@
                 <label for="bioCrystals">Glow Crystals Frequency</label>
                 <input type="number" id="bioCrystals" placeholder="0" min="0">
             </div>
+            <div class="form-group" style="margin-bottom: 0;">
+                <label for="bioCaveSmoothness">Cave Smoothness<span class="hint-text">(default 4)</span></label>
+                <input type="number" id="bioCaveSmoothness" placeholder="4.0" step="0.1" min="0">
+            </div>
+            <div class="form-group" style="margin-bottom: 0;">
+                <label for="bioCaveNoiseStrength">Cave Noise Strength<span class="hint-text">(default 8)</span></label>
+                <input type="number" id="bioCaveNoiseStrength" placeholder="8.0" step="0.5">
+            </div>
             <div class="form-group" style="margin-bottom: 0; grid-column: 1 / -1;">
                 <label for="bioCaveLayer">Cave Layer <span class="hint-text">(required in 0.3.0+ - a cave biome without one of these silently never spawns, with only a server log warning)</span></label>
                 <select id="bioCaveLayer" onchange="document.getElementById('bioCaveLayerCustom').style.display = this.value === '__custom__' ? 'block' : 'none'; window.markFormAsDirty();">
@@ -257,12 +302,61 @@
         </div>
     </div>
 
+    <div class="biome-dashboard-split" style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-top: 24px;">
+        <div class="biome-section-box" style="padding: 20px;">
+            <h3>Biome Tags</h3>
+            <span class="field-explanation" style="display: block; margin: -6px 0 12px;">Tags drive structure tables and cave-layer assignment. A cave biome needs a tag ending in <code>_layer</code> (also selectable below).</span>
+            <div id="biomeTagsContainer" class="form-group" style="display: flex; flex-wrap: wrap; gap: 6px; min-height: 40px; padding: 8px; border: 1px solid var(--border-color); border-radius: 4px; align-items: center; cursor: text; margin: 0;">
+                <input type="text" id="biomeTagTextInput" placeholder="Type a tag and press Enter..." autocomplete="off" style="flex: 1; min-width: 140px; border: none; background: transparent; color: var(--text); outline: none;">
+            </div>
+        </div>
+        <div class="biome-section-box" style="padding: 20px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border); padding-bottom: 10px; margin-bottom: 16px;">
+                <h3 style="margin: 0; padding: 0; border: none; line-height: 1;">Sub-biomes (Nested)</h3>
+                <button type="button" class="btn-secondary" onclick="window.addParentBiomeRow()" style="background: var(--accent); color: #000; margin: 0; padding: 8px 16px; font-size: 13px; font-weight: bold; height: 34px; border-radius: 4px;">+ Add Sub-biome</button>
+            </div>
+            <span class="field-explanation" style="display: block; margin: -6px 0 12px;">This biome can also appear nested inside the listed parent biome(s).</span>
+            <div id="bioParentBiomes" style="display: flex; flex-direction: column; gap: 12px; min-height: 20px;"></div>
+        </div>
+    </div>
+
     <div class="biome-section-box" style="margin-top: 24px; padding: 20px;">
         <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border); padding-bottom: 10px; margin-bottom: 20px;">
             <h3 style="margin: 0; padding: 0; border: none; line-height: 1;">Foliage, Decor & Structures</h3>
             <button type="button" class="btn-secondary" onclick="window.addStructureRow()" style="background: var(--accent); color: #000; margin: 0; padding: 8px 16px; font-size: 13px; font-weight: bold; height: 34px; display: inline-flex; align-items: center; justify-content: center; border-radius: 4px;">+ Add Structure Layer</button>
         </div>
         <div id="biomeStructuresContainer" style="display: flex; flex-direction: column; gap: 16px; min-height: 20px;"></div>
+    </div>
+
+    <div class="biome-section-box" style="margin-top: 24px; padding: 20px;">
+        <div class="chunk-preview-head">
+            <h3 style="margin: 0; padding: 0; border: none; line-height: 1;">Chunk Preview</h3>
+            <div class="chunk-preview-toolbar">
+                <div class="chunk-preview-field">
+                    <label for="chunkPreviewSeed">Seed</label>
+                    <input type="text" id="chunkPreviewSeed" value="12345" autocomplete="off" spellcheck="false">
+                    <button type="button" class="chunk-preview-icon-btn" onclick="window.randomizeChunkSeed()" title="Randomize seed" aria-label="Randomize seed">&#8635;</button>
+                </div>
+                <div class="chunk-preview-sizes" id="chunkPreviewSizes" role="group" aria-label="Preview size">
+                    <button type="button" data-size="32">32³</button>
+                    <button type="button" data-size="64" class="active">64³</button>
+                    <button type="button" data-size="96">96³</button>
+                    <button type="button" data-size="128">128³</button>
+                    <button type="button" data-size="256">256³</button>
+                </div>
+                <div class="chunk-preview-toggles" id="chunkPreviewToggles">
+                    <button type="button" data-toggle="grid" title="Toggle grid">Grid</button>
+                    <button type="button" data-toggle="axes" title="Toggle axes (Cubyz is XZY)">XZY</button>
+                    <button type="button" data-toggle="fps" title="Toggle FPS / stats">FPS</button>
+                    <button type="button" data-toggle="fly" title="Toggle fly mode (WASD + drag to look)">Fly</button>
+                </div>
+            </div>
+        </div>
+        <div id="chunkPreviewContainer" class="chunk-preview-container">
+            <canvas id="chunkPreviewCanvas"></canvas>
+            <div class="chunk-preview-hint" id="chunkPreviewHint">Drag to orbit · scroll to zoom</div>
+        </div>
+        <div id="chunkPreviewStatus" class="chunk-preview-status"></div>
     </div>
 
 </div>

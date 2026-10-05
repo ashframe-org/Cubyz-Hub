@@ -1,3 +1,35 @@
+// Structure feature type metadata (crisp SVG icons instead of emoji).
+if (!window.STRUCT_META) {
+    const svg = (paths) => `<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${paths}</svg>`;
+    window.STRUCT_META = {
+        '': { label: 'Select a feature…', icon: svg('<path d="M12 5v14M5 12h14"/>') },
+        'cubyz:simple_tree': { label: 'Standard Tree', icon: svg('<path d="M12 2 6 11h12L12 2Z"/><path d="M12 11v9"/>') },
+        'cubyz:simple_vegetation': { label: 'Single Foliage Sprite', icon: svg('<path d="M12 21V9"/><path d="M12 15c-4 0-6-2-6-6 4 0 6 2 6 6Z"/><path d="M12 12c4 0 6-2 6-6-4 0-6 2-6 6Z"/>') },
+        'cubyz:flower_patch': { label: 'Foliage Cluster/Patch', icon: svg('<circle cx="12" cy="7" r="3"/><circle cx="7" cy="12" r="3"/><circle cx="17" cy="12" r="3"/><circle cx="12" cy="17" r="3"/><circle cx="12" cy="12" r="1.6"/>') },
+        'cubyz:boulder': { label: 'Rock Boulder', icon: svg('<path d="M4 19h16l-3-9-4 2-3-6-6 13Z"/>') },
+        'cubyz:ground_patch': { label: 'Ground Surface Patch', icon: svg('<rect x="3" y="6" width="8" height="6" rx="1"/><rect x="13" y="12" width="8" height="6" rx="1"/>') },
+        'cubyz:fallen_tree': { label: 'Fallen Log', icon: svg('<rect x="3" y="10" width="15" height="5" rx="2.5"/><path d="M18 12.5h3"/>') },
+        'cubyz:sbb': { label: 'SBB Structure', icon: svg('<path d="M12 3 4 7v10l8 4 8-4V7l-8-4Z"/><path d="M4 7l8 4 8-4"/><path d="M12 11v10"/>') },
+        'cubyz:stalagmite': { label: 'Stalagmite / Stalactite', icon: svg('<path d="M12 3 7 20h10L12 3Z"/>') },
+    };
+    window.selectStructType = function (rowId, key) {
+        const m = window.STRUCT_META[key] || window.STRUCT_META[''];
+        const val = document.getElementById(`${rowId}_value`);
+        if (val) val.value = key;
+        const btn = document.getElementById(`${rowId}_search`);
+        if (btn) {
+            const iconEl = btn.querySelector('.struct-type-icon');
+            const labelEl = btn.querySelector('.struct-type-label');
+            if (iconEl) iconEl.innerHTML = m.icon;
+            if (labelEl) labelEl.textContent = m.label;
+        }
+        window.toggleStructSubFields(rowId, key);
+        const dd = document.getElementById(`${rowId}_selectDropdown`);
+        if (dd) dd.style.display = 'none';
+        if (typeof window.markFormAsDirty === 'function') window.markFormAsDirty();
+    };
+}
+
 window.handleRotationChange = function(val) {
     const fb = document.getElementById('hasItemIcon');
     if (fb) {
@@ -238,6 +270,10 @@ async function loadStudioPanel(panelName, buttonElement, targetIdToEdit = null) 
         if (!(await window.showCustomConfirm("Unsaved Changes Warning", "You have unsaved changes! Discard and switch panels?"))) return;
     }
 
+    if (window.currentPanelName === 'biomes' && panelName !== 'biomes' && typeof window.disposeBiomePreview === 'function') {
+        window.disposeBiomePreview();
+    }
+
     document.querySelectorAll('.nav-btn').forEach(btn => btn.classList.remove('active'));
     if (buttonElement) buttonElement.classList.add('active');
     else {
@@ -247,7 +283,7 @@ async function loadStudioPanel(panelName, buttonElement, targetIdToEdit = null) 
 
     try {
         window.isInitializingPanel = true;
-        const res = await fetch(`${panelName}.html`);
+        const res = await fetch(`${panelName}.html?v=20261004-1`);
         if (!res.ok) throw new Error("Panel template fetch failed.");
 
         document.getElementById('dynamicWorkspace').innerHTML = await res.text();
@@ -272,6 +308,9 @@ async function loadStudioPanel(panelName, buttonElement, targetIdToEdit = null) 
             window.initDynamicTagSystem('entityTagsContainer', 'entityTagTextInput', []);
         } else if (panelName === 'particles') {
             window.toggleParticleShapeFields('point'); window.toggleParticleDirectionFields('spread');
+        } else if (panelName === 'biomes') {
+            window.initDynamicTagSystem('biomeTagsContainer', 'biomeTagTextInput', []);
+            ['bioGroundLayers', 'bioParentBiomes', 'biomeStructuresContainer'].forEach(elId => { const el = document.getElementById(elId); if (el) el.innerHTML = ''; });
         }
 
         if (targetIdToEdit) {
@@ -280,6 +319,8 @@ async function loadStudioPanel(panelName, buttonElement, targetIdToEdit = null) 
         }
 
         window.isInitializingPanel = false;
+
+        if (panelName === 'biomes' && typeof window.initBiomePreview === 'function') window.initBiomePreview();
 
         if (['recipes', 'biomes', 'entities', 'particles'].includes(panelName)) {
             if (typeof window.renderDropOptions === 'function') window.renderDropOptions();
@@ -390,17 +431,47 @@ window.populateRecipeFormValues = function(filename) {
 window.populateBiomeFormValues = function(id) {
     const d = window.projectData.biomes.find(b => b.id === id);
     if (!d) return;
-    const setVal = (id, val) => { const el = document.getElementById(id); if (el) el.value = val; };
+    const setVal = (elId, val) => { const el = document.getElementById(elId); if (el && val !== undefined && val !== null) el.value = val; };
+    const setChecked = (elId, val) => { const el = document.getElementById(elId); if (el) el.checked = !!val; };
 
-    ['biomeId', 'biomeChance', 'bioInterpolation', 'bioMinRadius', 'bioMaxRadius', 'bioMinHeight', 'bioMaxHeight', 'bioMinHeightLimit', 'bioMaxHeightLimit', 'bioRoughness', 'bioHills', 'bioMountains', 'bioSoilCreep', 'bioKeepOriginalTerrain', 'bioSurfaceBlock', 'bioSubBlock', 'bioStoneBlock', 'bioCaves', 'bioCaveRadiusFactor', 'bioCrystals', 'bioMusic', 'bioFogDensity'].forEach(k => {
-        let key = k.startsWith('bioM') || k.startsWith('bioS') ? k.replace('bio', 'bio').charAt(3).toLowerCase() + k.slice(4) : k.replace('bio', '');
-        if(k === 'biomeId') key = 'id'; if(k === 'biomeChance') key = 'chance';
-        setVal(k, d[key] || "");
-    });
+    setVal('biomeId', d.id);
+    setVal('biomeChance', d.chance);
+    setVal('bioInterpolation', d.interpolation || '.square');
+    setVal('bioMinRadius', d.minRadius);
+    setVal('bioMaxRadius', d.maxRadius);
+    setVal('bioMinHeight', d.minHeight);
+    setVal('bioMaxHeight', d.maxHeight);
+    setVal('bioMinHeightLimit', d.minHeightLimit);
+    setVal('bioMaxHeightLimit', d.maxHeightLimit);
+    setVal('bioRoughness', d.roughness);
+    setVal('bioHills', d.hills);
+    setVal('bioMountains', d.mountains);
+    setVal('bioSoilCreep', d.soilCreep);
+    setVal('bioKeepOriginalTerrain', d.keepOriginalTerrain);
+    setVal('bioInterpolationWeight', d.interpolationWeight);
+    setVal('bioMaxSubBiomeCount', d.maxSubBiomeCount);
+    setVal('bioSurfaceBlock', d.surfaceBlock);
+    setVal('bioSubBlock', d.subBlock);
+    setVal('bioSubMin', d.subMin);
+    setVal('bioSubMax', d.subMax);
+    setVal('bioStoneBlock', d.stoneBlock);
+    setVal('bioCaves', d.caves);
+    setVal('bioCaveRadiusFactor', d.caveRadiusFactor);
+    setVal('bioCaveSmoothness', d.caveSmoothness);
+    setVal('bioCaveNoiseStrength', d.caveNoiseStrength);
+    setVal('bioCrystals', d.crystals);
+    setVal('bioMusic', d.music);
+    setVal('bioFogDensity', d.fogDensity);
+    setVal('bioFogLower', d.fogLower);
+    setVal('bioFogHigher', d.fogHigher);
 
-    document.getElementById('bioSmoothBeaches').checked = d.smoothBeaches;
-    document.getElementById('bioIsCave').checked = d.isCave;
-    document.getElementById('bioSpawn').checked = d.isValidPlayerSpawn;
+    const interpLabels = { '.square': '.square (Smooth Default)', '.linear': '.linear', '.none': '.none' };
+    setVal('bioInterpolationSearch', interpLabels[d.interpolation] || interpLabels['.square']);
+
+    setChecked('bioSmoothBeaches', d.smoothBeaches);
+    setChecked('bioIsCave', d.isCave);
+    setChecked('bioSpawn', d.isValidPlayerSpawn);
+    setChecked('bioRivers', d.rivers);
     setVal('bioSkyColor', d.skyColorHex || "#75b2ff");
     setVal('bioFogColor', d.fogColorHex || "#e2f2ff");
     if (document.getElementById('caveSettings')) document.getElementById('caveSettings').style.display = d.isCave ? 'grid' : 'none';
@@ -423,7 +494,15 @@ window.populateBiomeFormValues = function(id) {
     }
 
     const checkRadio = (name, val) => { const r = document.querySelector(`input[name="${name}"][value="${val}"]`); if (r) r.checked = true; };
-    checkRadio('bioTemp', d.climate); checkRadio('bioWet', d.humidity); checkRadio('bioZone', 'zone'); checkRadio('bioGrowth', d.growth); checkRadio('bioHeightProp', d.elevationType);
+    checkRadio('bioTemp', d.climate); checkRadio('bioWet', d.humidity); checkRadio('bioZone', d.zone); checkRadio('bioGrowth', d.growth); checkRadio('bioHeightProp', d.elevationType);
+
+    window.initDynamicTagSystem('biomeTagsContainer', 'biomeTagTextInput', d.tags || []);
+
+    const groundCont = document.getElementById('bioGroundLayers');
+    if (groundCont) { groundCont.innerHTML = ''; (d.groundLayers || []).forEach(l => window.addGroundLayerRow(l)); }
+
+    const parentCont = document.getElementById('bioParentBiomes');
+    if (parentCont) { parentCont.innerHTML = ''; (d.parentBiomes || []).forEach(p => window.addParentBiomeRow(p)); }
 
     const cont = document.getElementById('biomeStructuresContainer');
     if (cont) { cont.innerHTML = ''; if (d.structures?.length) d.structures.forEach(s => window.addStructureRow(s)); }
@@ -435,6 +514,9 @@ window.populateEntityFormValues = function(id) {
     document.getElementById('entityId').value = d.id;
     document.getElementById('entityHeight').value = d.height || "2.0";
     document.getElementById('entityCoordSystem').value = d.coordinateSystem || ".right_handed_z_up";
+    const coordOption = Array.from(document.querySelectorAll('#entityCoordSystemDropdown .dropdown-option'))
+        .find(el => el.getAttribute('onmousedown')?.includes(`'${document.getElementById('entityCoordSystem').value}'`));
+    if (coordOption) document.getElementById('entityCoordSystemSearch').value = coordOption.textContent.trim();
     document.getElementById('entityModelSearch').value = d.model || "";
     document.getElementById('entityTextureSearch').value = d.defaultTexture || "";
     window.initDynamicTagSystem('entityTagsContainer', 'entityTagTextInput', d.tags || []);
@@ -544,12 +626,15 @@ window.loadRecipePreset = key => {
 window.loadBiomePreset = function(key) {
     const cont = document.getElementById('biomeStructuresContainer');
     if (cont) cont.innerHTML = '';
+    ['bioGroundLayers', 'bioParentBiomes'].forEach(elId => { const el = document.getElementById(elId); if (el) el.innerHTML = ''; });
+    window.initDynamicTagSystem('biomeTagsContainer', 'biomeTagTextInput', []);
 
     if (key === 'mountain') {
         Object.assign(document.getElementById('biomeId'), { value: "misty_peaks" });
         document.getElementById('bioMinHeight').value = 100; document.getElementById('bioMaxHeight').value = 150;
         document.getElementById('bioSurfaceBlock').value = "cubyz:cold_grass"; document.getElementById('bioSubBlock').value = "cubyz:permafrost";
         document.getElementById('bioStoneBlock').value = "cubyz:glacite/smooth";
+        document.getElementById('bioRivers').checked = true;
         ['cubyz:sbb', 'cubyz:sbb', 'cubyz:ground_patch', 'cubyz:flower_patch', 'cubyz:boulder'].forEach(id => window.addStructureRow({ id, chance: 0.01 }));
     } else if (key === 'cave') {
         Object.assign(document.getElementById('biomeId'), { value: "deep_abyss_caves" });
@@ -684,9 +769,68 @@ window.handleCustomBlockTexture = async function(inputElement, targetSearchId) {
 };
 window.handleCustomTexture = window.handleCustomBlockTexture;
 
+window.addGroundLayerRow = function(savedData = null) {
+    const container = document.getElementById('bioGroundLayers');
+    if (!container) return;
+    const rowId = 'ground_layer_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7);
+    const row = document.createElement('div');
+    row.className = 'ground-layer-row';
+    row.id = rowId;
+    row.style = 'display: grid; grid-template-columns: 2fr 76px 76px auto; gap: 8px; align-items: end; background: #1e1e1e; padding: 10px; border-radius: 4px; border: 1px solid #3c3c3c;';
+    row.innerHTML = `
+    <div class="texture-select-wrapper" style="position: relative;">
+        <label style="font-size:11px; color:#888; display:block; margin-bottom:4px;">Layer Block</label>
+        <input type="text" id="${rowId}_in" class="ground-layer-block" value="${savedData?.block || ''}" placeholder="cubyz:soil" autocomplete="off" onfocus="window.showRecipeDropdown('${rowId}_drop', '${rowId}_in', 'blocks')" oninput="window.filterDropdown('${rowId}_in', '${rowId}_drop')" style="padding:6px; background:#252526; border:1px solid #3c3c3c; color:white; border-radius:4px; width:100%; box-sizing:border-box;">
+        <div id="${rowId}_drop" class="dropdown-options"></div>
+    </div>
+    <div>
+        <label style="font-size:11px; color:#888; display:block; margin-bottom:4px;">Min</label>
+        <input type="number" class="ground-layer-min" value="${savedData?.min ?? ''}" placeholder="1" min="0" style="padding:6px; background:#252526; border:1px solid #3c3c3c; color:white; border-radius:4px; width:100%; box-sizing:border-box;">
+    </div>
+    <div>
+        <label style="font-size:11px; color:#888; display:block; margin-bottom:4px;">Max</label>
+        <input type="number" class="ground-layer-max" value="${savedData?.max ?? ''}" placeholder="3" min="0" style="padding:6px; background:#252526; border:1px solid #3c3c3c; color:white; border-radius:4px; width:100%; box-sizing:border-box;">
+    </div>
+    <button type="button" onclick="document.getElementById('${rowId}').remove(); window.markFormAsDirty();" style="background:#dc3545; padding:8px 12px; height:34px; cursor:pointer; border:none; color:white; border-radius:4px;">Remove</button>
+    `;
+    container.appendChild(row);
+    row.querySelectorAll('input').forEach(inp => inp.addEventListener('input', () => { if (!window.isInitializingPanel) window.markFormAsDirty(); }));
+};
+
+window.addParentBiomeRow = function(savedData = null) {
+    const container = document.getElementById('bioParentBiomes');
+    if (!container) return;
+    const rowId = 'parent_biome_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7);
+    const row = document.createElement('div');
+    row.className = 'parent-biome-row';
+    row.id = rowId;
+    row.style = 'display: grid; grid-template-columns: 2fr 80px 100px auto; gap: 8px; align-items: end; background: #1e1e1e; padding: 10px; border-radius: 4px; border: 1px solid #3c3c3c;';
+    row.innerHTML = `
+    <div>
+        <label style="font-size:11px; color:#888; display:block; margin-bottom:4px;">Parent Biome ID</label>
+        <input type="text" class="parent-biome-id" value="${savedData?.id || ''}" placeholder="forest" autocomplete="off" style="padding:6px; background:#252526; border:1px solid #3c3c3c; color:white; border-radius:4px; width:100%; box-sizing:border-box;">
+    </div>
+    <div>
+        <label style="font-size:11px; color:#888; display:block; margin-bottom:4px;">Chance</label>
+        <input type="number" class="parent-biome-chance" value="${savedData?.chance ?? ''}" placeholder="1.0" step="0.01" style="padding:6px; background:#252526; border:1px solid #3c3c3c; color:white; border-radius:4px; width:100%; box-sizing:border-box;">
+    </div>
+    <div>
+        <label style="font-size:11px; color:#888; display:block; margin-bottom:4px;">Edge Distance</label>
+        <input type="number" class="parent-biome-distance" value="${savedData?.parentEdgeDistance ?? ''}" placeholder="default" style="padding:6px; background:#252526; border:1px solid #3c3c3c; color:white; border-radius:4px; width:100%; box-sizing:border-box;">
+    </div>
+    <button type="button" onclick="document.getElementById('${rowId}').remove(); window.markFormAsDirty();" style="background:#dc3545; padding:8px 12px; height:34px; cursor:pointer; border:none; color:white; border-radius:4px;">Remove</button>
+    `;
+    container.appendChild(row);
+    row.querySelectorAll('input').forEach(inp => inp.addEventListener('input', () => { if (!window.isInitializingPanel) window.markFormAsDirty(); }));
+};
+
 window.addStructureRow = function(savedData = null) {
     const container = document.getElementById('biomeStructuresContainer');
     if (!container) return;
+    // Guard against accidental double-adds (e.g. double click while lagging).
+    const now = Date.now();
+    if (window._lastAddStructureAt && now - window._lastAddStructureAt < 250) return;
+    window._lastAddStructureAt = now;
     const rowId = 'struct_row_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5);
 
     const row = document.createElement('div');
@@ -694,38 +838,49 @@ window.addStructureRow = function(savedData = null) {
     row.className = 'structure-row-entry';
     row.style = 'background: #1e1e1e; padding: 12px; border-radius: 4px; border: 1px solid #3c3c3c; margin-bottom: 8px;';
 
-    const typeValue = savedData ? savedData.id : 'cubyz:simple_tree';
+    const typeValue = savedData ? (savedData.id || '') : '';
     const chanceValue = savedData ? savedData.chance : 0.05;
+    const modeValue = savedData?.generationMode || '';
+    const priorityValue = savedData?.priority ?? '';
 
-    const displayLabels = {
-        'cubyz:simple_tree': '🌳 Standard Tree',
-        'cubyz:simple_vegetation': '🌿 Single Foliage Sprite',
-        'cubyz:flower_patch': '🌸 Foliage Cluster/Patch',
-        'cubyz:boulder': '🪨 Rock Boulder',
-        'cubyz:ground_patch': '🗺️ Ground Surface Patch',
-        'cubyz:fallen_tree': '🪵 Fallen Log',
-        'cubyz:sbb': '🏗️ SBB Schematic Feature'
-    };
+    const meta = window.STRUCT_META;
+    const modeOptions = ['floor', 'ceiling', 'floor_and_ceiling', 'air', 'underground', 'water_surface'];
+    const current = meta[typeValue] || meta[''];
 
     row.innerHTML = `
-    <div style="display: flex; gap: 15px; align-items: center;">
-    <div style="flex: 2; position: relative;">
+    <div style="display: flex; gap: 15px; align-items: center; flex-wrap: wrap;">
+    <div style="flex: 2; min-width: 200px; position: relative;">
     <label style="font-size:12px; color:#aaa;">Structure Feature Type</label>
     <input type="hidden" class="struct-type-selector" id="${rowId}_value" value="${typeValue}">
-    <input type="text" id="${rowId}_search" value="${displayLabels[typeValue] || '🌳 Standard Tree'}" readonly style="cursor: pointer; padding: 10px; background: #252526; border: 1px solid #3c3c3c; color: white; border-radius: 4px; width: 100%; box-sizing: border-box;" onfocus="document.getElementById('${rowId}_selectDropdown').style.display='block'">
+    <button type="button" id="${rowId}_search" onclick="document.getElementById('${rowId}_selectDropdown').style.display='block'" style="display:flex; align-items:center; gap:8px; padding:9px 10px; background:#252526; border:1px solid #3c3c3c; color:white; border-radius:4px; width:100%; box-sizing:border-box; cursor:pointer; text-align:left; font-size:13px;">
+      <span class="struct-type-icon" style="display:inline-flex; width:16px; flex-shrink:0;">${current.icon}</span>
+      <span class="struct-type-label">${current.label}</span>
+    </button>
     <div id="${rowId}_selectDropdown" class="dropdown-options" style="display: none; position: absolute; width: 100%; background: #1e1e1e; border: 1px solid #3c3c3c; z-index: 1000; box-sizing: border-box;">
-    ${Object.keys(displayLabels).map(k => `<div class="dropdown-option" style="padding: 6px 12px; cursor: pointer;" onmousedown="document.getElementById('${rowId}_value').value='${k}'; document.getElementById('${rowId}_search').value='${displayLabels[k]}'; window.toggleStructSubFields('${rowId}', '${k}'); document.getElementById('${rowId}_selectDropdown').style.display='none';">${displayLabels[k]}</div>`).join('')}
+    ${Object.keys(meta).map(k => `<div class="dropdown-option" style="padding: 6px 12px; cursor: pointer; display:flex; align-items:center; gap:8px;" onmousedown="window.selectStructType('${rowId}', '${k}')"><span style="display:inline-flex; width:16px; flex-shrink:0;">${meta[k].icon}</span><span>${meta[k].label}</span></div>`).join('')}
     </div>
     </div>
     <div style="width: 130px;">
     <label style="font-size:12px; color:#aaa;">Spawn Chance</label>
     <input type="number" class="struct-chance" value="${chanceValue}" step="0.001" min="0" max="1" style="padding:8px; background:#252526; border:1px solid #3c3c3c; color:white; border-radius:4px; box-sizing:border-box; width:100%;">
     </div>
+    <div style="width: 160px;">
+    <label style="font-size:12px; color:#aaa;">Generation Mode</label>
+    <select class="struct-generation-mode" style="padding:8px; background:#252526; border:1px solid #3c3c3c; color:white; border-radius:4px; box-sizing:border-box; width:100%;">
+    <option value="">(type default)</option>
+    ${modeOptions.map(m => `<option value="${m}"${m === modeValue ? ' selected' : ''}>${m}</option>`).join('')}
+    </select>
+    </div>
+    <div style="width: 90px;">
+    <label style="font-size:12px; color:#aaa;">Priority</label>
+    <input type="number" class="struct-priority" value="${priorityValue}" placeholder="1" step="0.1" style="padding:8px; background:#252526; border:1px solid #3c3c3c; color:white; border-radius:4px; box-sizing:border-box; width:100%;">
+    </div>
     <button type="button" onclick="document.getElementById('${rowId}').remove(); window.markFormAsDirty();" style="background:#dc3545; padding:8px 12px; margin-top:18px; font-size:12px; height:36px; cursor:pointer; border:none; color:white; border-radius:4px;">Remove</button>
     </div>
     <div class="struct-subfields-wrapper" style="margin-top:12px; padding-top:10px; border-top:1px dashed #3c3c3c; display:grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap:10px;"></div>
     `;
     container.appendChild(row);
+    row.querySelectorAll('.struct-chance, .struct-generation-mode, .struct-priority').forEach(inp => inp.addEventListener('input', () => { if (!window.isInitializingPanel) window.markFormAsDirty(); }));
     window.toggleStructSubFields(rowId, typeValue, savedData);
 };
 
@@ -734,10 +889,10 @@ window.toggleStructSubFields = function(rowId, type, data = null) {
     if (!wrapper) return;
     wrapper.innerHTML = '';
 
-    const createInputHTML = (label, className, val, placeholder, dropdownId, searchId) => `
+    const createInputHTML = (label, className, val, placeholder, dropdownId, searchId, assetType = 'blocks') => `
     <div class="texture-select-wrapper" style="position: relative;">
     <label style="font-size:11px; color:#888; display:block; margin-bottom:4px;">${label}</label>
-    <input type="text" class="${className}" id="${searchId}" ${val ? `value="${val}"` : ''} placeholder="${placeholder}" autocomplete="off" onfocus="window.showRecipeDropdown('${dropdownId}', '${searchId}', 'blocks')" oninput="window.filterDropdown('${searchId}', '${dropdownId}')" style="padding:6px; background:#252526; border:1px solid #3c3c3c; color:white; border-radius:4px; width:100%; box-sizing:border-box;">
+    <input type="text" class="${className}" id="${searchId}" ${val ? `value="${val}"` : ''} placeholder="${placeholder}" autocomplete="off" onfocus="window.showRecipeDropdown('${dropdownId}', '${searchId}', '${assetType}')" oninput="window.filterDropdown('${searchId}', '${dropdownId}')" style="padding:6px; background:#252526; border:1px solid #3c3c3c; color:white; border-radius:4px; width:100%; box-sizing:border-box;">
     <div id="${dropdownId}" class="dropdown-options"></div>
     </div>`;
 
@@ -748,23 +903,25 @@ window.toggleStructSubFields = function(rowId, type, data = null) {
     </div>`;
 
     if (type === 'cubyz:simple_tree') {
-        wrapper.innerHTML = createInputHTML('Log Block', 'field-log', data?.log, 'cubyz:oak_log', rowId+'_logDrop', rowId+'_logIn') +
-        createInputHTML('Leaves Block', 'field-leaves', data?.leaves, 'cubyz:leaves/oak', rowId+'_leDrop', rowId+'_leIn') +
+        wrapper.innerHTML = createInputHTML('Log Block', 'field-log', data?.log, 'cubyz:oak_log', rowId+'_logDrop', rowId+'_logIn', 'logs') +
+        createInputHTML('Leaves Block', 'field-leaves', data?.leaves, 'cubyz:leaves/oak', rowId+'_leDrop', rowId+'_leIn', 'leaves') +
         createNormalInputHTML('Base Trunk Height', 'field-height', data?.height, '6') +
         createNormalInputHTML('Height Variance', 'field-height-var', data?.height_variation, '3') +
         createNormalInputHTML('Crown Size (leafRadius)', 'field-leaf-radius', data?.leafRadius, '2');
     } else if (type === 'cubyz:simple_vegetation') {
-        wrapper.innerHTML = createInputHTML('Foliage Sprite Block', 'field-block', data?.block, 'cubyz:fern', rowId+'_vegDrop', rowId+'_vegIn') + createNormalInputHTML('Sprite Max Height', 'field-height', data?.height, '1');
+        wrapper.innerHTML = createInputHTML('Foliage Sprite Block', 'field-block', data?.block, 'cubyz:fern', rowId+'_vegDrop', rowId+'_vegIn', 'plants') + createNormalInputHTML('Sprite Max Height', 'field-height', data?.height, '1') + createNormalInputHTML('Height Variance', 'field-height-var', data?.height_variation, '0');
     } else if (type === 'cubyz:flower_patch') {
-        wrapper.innerHTML = createInputHTML('Foliage/Flower Block', 'field-block', data?.block, 'cubyz:daffodil', rowId+'_flDrop', rowId+'_flIn') + createNormalInputHTML('Patch Width Scale', 'field-width', data?.width, '10') + createNormalInputHTML('Patch Variance', 'field-variation', data?.variation, '6') + createNormalInputHTML('Patch Density', 'field-density', data?.density, '0.3');
+        wrapper.innerHTML = createInputHTML('Foliage/Flower Block', 'field-block', data?.block, 'cubyz:daffodil', rowId+'_flDrop', rowId+'_flIn', 'plants') + createNormalInputHTML('Patch Width Scale', 'field-width', data?.width, '10') + createNormalInputHTML('Patch Variance', 'field-variation', data?.variation, '6') + createNormalInputHTML('Patch Density', 'field-density', data?.density, '0.3');
     } else if (type === 'cubyz:boulder') {
         wrapper.innerHTML = createInputHTML('Stone Block Variant', 'field-block', data?.block, 'cubyz:slate/rough', rowId+'_boDrop', rowId+'_boIn') + createNormalInputHTML('Base Radius Size', 'field-size', data?.size, '5') + createNormalInputHTML('Size Variance Step', 'field-size-var', data?.size_variance, '4');
     } else if (type === 'cubyz:ground_patch') {
         wrapper.innerHTML = createInputHTML('Replacement Block', 'field-block', data?.block, 'cubyz:gravel', rowId+'_gpDrop', rowId+'_gpIn') + createNormalInputHTML('Patch Width', 'field-width', data?.width, '5') + createNormalInputHTML('Patch Depth layers', 'field-depth', data?.depth, '2') + createNormalInputHTML('Edge Smoothness (0-1)', 'field-smoothness', data?.smoothness, '0.2');
     } else if (type === 'cubyz:fallen_tree') {
-        wrapper.innerHTML = createInputHTML('Log Block Type', 'field-log', data?.log, 'cubyz:oak_log', rowId+'_ftDrop', rowId+'_ftIn') + createNormalInputHTML('Log Length size', 'field-height', data?.height, '6') + createNormalInputHTML('Length Variance', 'field-height-var', data?.height_variation, '3');
+        wrapper.innerHTML = createInputHTML('Log Block Type', 'field-log', data?.log, 'cubyz:oak_log', rowId+'_ftDrop', rowId+'_ftIn', 'logs') + createNormalInputHTML('Log Length size', 'field-height', data?.height, '6') + createNormalInputHTML('Length Variance', 'field-height-var', data?.height_variation, '3');
     } else if (type === 'cubyz:sbb') {
-        wrapper.innerHTML = createNormalInputHTML('SBB Asset path ID', 'field-structure', data?.structure, 'cubyz:tree/coniferous/pine/loblolly') + createNormalInputHTML('Place Mode flag', 'field-placemode', data?.placeMode, '.degradable');
+        wrapper.innerHTML = createInputHTML('SBB Structure (presets: pick a tree...)', 'field-structure', data?.structure, 'cubyz:tree/oak/young', rowId+'_sbbDrop', rowId+'_sbbIn', 'sbb') + createNormalInputHTML('Place Mode flag', 'field-placemode', data?.placeMode, '.degradable');
+    } else if (type === 'cubyz:stalagmite') {
+        wrapper.innerHTML = createInputHTML('Stalagmite Block', 'field-block', data?.block, 'cubyz:stalagmite', rowId+'_stDrop', rowId+'_stIn') + createNormalInputHTML('Base Size', 'field-size', data?.size, '12') + createNormalInputHTML('Size Variation', 'field-size-var', data?.size_variation, '8') + createNormalInputHTML('Base Slope', 'field-base-slope', data?.baseSlope, '4') + createNormalInputHTML('Top Slope', 'field-top-slope', data?.topSlope, '4');
     }
 
     wrapper.querySelectorAll('input, select').forEach(input => input.addEventListener('input', () => { if (!window.isInitializingPanel) window.markFormAsDirty(); }));
@@ -813,37 +970,65 @@ window.showRecipeDropdown = function(dropdownId, inputId, assetType = 'blocks') 
     dropdown.innerHTML = '';
     dropdown.style.display = 'block';
 
-    let itemsPool = [];
-    if (window.projectData) {
-        if (window.projectData.blocks) itemsPool.push(...window.projectData.blocks.map(b => ({ name: b.id, source: 'custom' })));
-        if (window.projectData.items) itemsPool.push(...window.projectData.items.map(i => ({ name: i.id, source: 'custom' })));
+    const short = (n) => String(n || '').replace(/^[a-z0-9_]+:/, '');
+    const blockMap = new Map();
+    const itemMap = new Map();
+    const addBlock = (name) => { const n = short(name); if (n && !n.endsWith('_reflectivity') && !blockMap.has(n)) blockMap.set(n, n); };
+    const addItem = (name) => { const n = short(name); if (n && !itemMap.has(n)) itemMap.set(n, n); };
+
+    (window.projectData?.blocks || []).forEach((b) => addBlock(b.id));
+    (window.serverBlocks || []).forEach(addBlock);
+    (window.projectData?.items || []).forEach((it) => addItem(it.id));
+    (window.serverItems || []).forEach(addItem);
+    (window.serverTextures || []).forEach((t) => {
+        if (t.isBlockType) addBlock(t.name);
+        else if (!t.isEntityType && !t.isParticleType) addItem(t.name);
+    });
+
+    const bt = window.blockTextures || {};
+    const isPlant = (name) => {
+        const info = bt[name];
+        if (!info) return /flower|dais|dandelion|vegetation|fern|sprout|lily|mushroom|glimmergill|cactus|vine|monstera|sapling|bluebell|bush/.test(name);
+        const model = info.model || 'cube';
+        return model === 'cross' || model === 'plane' || model === 'fern' || model.startsWith('flower/') || !!info.viewThrough;
+    };
+    const isLog = (name) => /(^|\/)log(\/|$)|log$|wood|trunk/.test(name);
+    const isLeaves = (name) => /leaves?(\/|$)|needles/.test(name);
+
+    let pool;
+    if (assetType === 'items') {
+        pool = [...itemMap.values()];
+    } else if (assetType === 'music') {
+        pool = (window.serverMusicList || []).slice();
+    } else if (assetType === 'sbb' || assetType === 'trees') {
+        let list = (window.serverSbbList || []).map((n) => `cubyz:${n}`);
+        if (assetType === 'trees') list = list.filter((n) => n.startsWith('cubyz:tree/'));
+        pool = list;
+    } else {
+        let blocks = [...blockMap.values()];
+        if (assetType === 'plants') blocks = blocks.filter(isPlant);
+        else if (assetType === 'logs') blocks = blocks.filter(isLog);
+        else if (assetType === 'leaves') blocks = blocks.filter(isLeaves);
+        else blocks = blocks.filter((n) => !isPlant(n)); // default: solid blocks
+        pool = blocks;
     }
 
-    if (window.serverTextures) {
-        itemsPool.push(...window.serverTextures.map(t => ({ name: t.name, source: 'vanilla' })));
-    }
-
-    const uniquePool = Array.from(new Map(itemsPool.map(item => [item.name, item])).values());
-
-    uniquePool.forEach(item => {
-        if (!item.name || item.name.startsWith('music/') || item.name.includes('sound') || item.name.startsWith('musicModels/')) {
-            return;
-        }
-
+    Array.from(new Set(pool)).sort().forEach((name) => {
+        if (!name || name.startsWith('music/') || name.includes('sound') || name.startsWith('musicModels/')) return;
         const opt = document.createElement('div');
         opt.className = 'dropdown-option';
         opt.style = 'padding: 6px 12px; cursor: pointer; color: #fff; background: #1e1e1e;';
-        opt.textContent = item.name;
+        opt.textContent = name;
 
         opt.onmousedown = (e) => {
             e.preventDefault();
-            input.value = item.name;
+            input.value = name;
             dropdown.style.display = 'none';
             input.dispatchEvent(new Event('change', { bubbles: true }));
             if (typeof window.initDropdownClearButtons === 'function') window.initDropdownClearButtons();
         };
 
-            dropdown.appendChild(opt);
+        dropdown.appendChild(opt);
     });
 
     window.filterDropdown(inputId, dropdownId);

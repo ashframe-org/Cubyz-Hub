@@ -54,6 +54,12 @@ async function toggleServerLike(serverId, btn, countEl) {
   }
 }
 
+function renderServerVersion(version) {
+  const v = String(version || "");
+  // "UPSTREAM" is a channel label, not a version number - don't prefix it.
+  return /^upstream$/i.test(v) ? escapeHTML(v) : "v" + escapeHTML(v);
+}
+
 function renderServerCard(server) {
   const card = document.createElement("a");
   card.className = "server-card";
@@ -61,6 +67,7 @@ function renderServerCard(server) {
 
   const iconSrc = server.icon_url || "assets/default_icon.png";
   const isOnline = !!server.online;
+  card.classList.toggle("is-online", isOnline);
 
   card.innerHTML = `
     <img class="server-card-icon" src="${escapeHTML(iconSrc)}" alt="" loading="lazy">
@@ -75,7 +82,7 @@ function renderServerCard(server) {
     <div class="server-card-stats">
       <span class="server-status-badge ${isOnline ? "server-status-online" : "server-status-offline"}">${isOnline ? `Online - ${escapeHTML(String(server.player_count ?? 0))} players` : "Offline"}</span>
       <div class="server-card-tags">
-        ${server.version ? `<span class="server-card-version">v${escapeHTML(server.version)}</span>` : ""}
+        ${server.version ? `<span class="server-card-version">${renderServerVersion(server.version)}</span>` : ""}
         ${server.requires_mods ? `<span class="server-card-version">Mods required</span>` : ""}
       </div>
       <button type="button" class="server-card-like${server.liked_by_viewer ? " liked" : ""}">

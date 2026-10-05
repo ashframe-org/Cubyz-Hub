@@ -308,7 +308,12 @@ function saveBiomeToProject(silent) {
 
     const structuralLayers = Array.from(document.querySelectorAll('.structure-row-entry')).map(row => {
         const type = row.querySelector('.struct-type-selector').value;
+        if (!type) return null;
         let s = { id: type, chance: parseFloat(row.querySelector('.struct-chance').value) || 0.05 };
+        const modeSel = row.querySelector('.struct-generation-mode');
+        if (modeSel && modeSel.value) s.generationMode = modeSel.value;
+        const prioInp = row.querySelector('.struct-priority');
+        if (prioInp && prioInp.value.trim() !== '') s.priority = parseFloat(prioInp.value);
         if (type === 'cubyz:simple_tree') {
             s.log = row.querySelector('.field-log').value.trim() || 'cubyz:oak_log';
             s.leaves = row.querySelector('.field-leaves').value.trim() || 'cubyz:leaves/oak';
@@ -318,8 +323,8 @@ function saveBiomeToProject(silent) {
             s.leafRadius = parseFloat(row.querySelector('.field-leaf-radius').value) || 2;
         } else if (type === 'cubyz:simple_vegetation' || type === 'cubyz:flower_patch' || type === 'cubyz:boulder' || type === 'cubyz:ground_patch') {
             s.block = row.querySelector('.field-block').value.trim() || (type === 'cubyz:simple_vegetation' ? 'cubyz:fern' : type === 'cubyz:boulder' ? 'cubyz:slate/rough' : type === 'cubyz:ground_patch' ? 'cubyz:gravel' : 'cubyz:daffodil');
-            if (type === 'cubyz:simple_vegetation') { s.height = parseInt(row.querySelector('.field-height').value) || 1; s.height_variation = 0; }
-            if (type === 'cubyz:flower_patch') { s.width = parseInt(row.querySelector('.field-width').value) || 10; s.variation = parseInt(row.querySelector('.field-variation').value) || 6; s.density = parseFloat(row.querySelector('.field-density').value) || 0.3; s.priority = 0.1; }
+            if (type === 'cubyz:simple_vegetation') { s.height = parseInt(row.querySelector('.field-height').value) || 1; s.height_variation = parseInt(row.querySelector('.field-height-var')?.value) || 0; }
+            if (type === 'cubyz:flower_patch') { s.width = parseInt(row.querySelector('.field-width').value) || 10; s.variation = parseInt(row.querySelector('.field-variation').value) || 6; s.density = parseFloat(row.querySelector('.field-density').value) || 0.3; if (s.priority === undefined) s.priority = 0.1; }
             if (type === 'cubyz:boulder') { s.size = parseInt(row.querySelector('.field-size').value) || 5; s.size_variance = parseInt(row.querySelector('.field-size-var').value) || 4; }
             if (type === 'cubyz:ground_patch') { s.width = parseInt(row.querySelector('.field-width').value) || 5; s.depth = parseInt(row.querySelector('.field-depth').value) || 2; s.smoothness = parseFloat(row.querySelector('.field-smoothness').value) || 0.2; }
         } else if (type === 'cubyz:fallen_tree') {
@@ -328,9 +333,30 @@ function saveBiomeToProject(silent) {
         } else if (type === 'cubyz:sbb') {
             s.structure = row.querySelector('.field-structure').value.trim() || 'cubyz:tree/coniferous/pine/loblolly';
             s.placeMode = row.querySelector('.field-placemode').value.trim() || '.degradable';
+        } else if (type === 'cubyz:stalagmite') {
+            s.block = row.querySelector('.field-block').value.trim() || 'cubyz:stalagmite';
+            s.size = parseFloat(row.querySelector('.field-size').value) || 12;
+            s.size_variation = parseFloat(row.querySelector('.field-size-var').value) || 8;
+            s.baseSlope = parseFloat(row.querySelector('.field-base-slope').value) || 4;
+            const topSlopeVal = row.querySelector('.field-top-slope')?.value.trim();
+            s.topSlope = topSlopeVal ? parseFloat(topSlopeVal) : s.baseSlope;
         }
         return s;
-    });
+    }).filter(Boolean);
+
+    const groundLayers = Array.from(document.querySelectorAll('#bioGroundLayers .ground-layer-row')).map(row => ({
+        block: autoNamespaceBlock(row.querySelector('.ground-layer-block').value),
+        min: row.querySelector('.ground-layer-min').value.trim(),
+        max: row.querySelector('.ground-layer-max').value.trim(),
+    })).filter(l => l.block);
+
+    const parentBiomes = Array.from(document.querySelectorAll('#bioParentBiomes .parent-biome-row')).map(row => ({
+        id: row.querySelector('.parent-biome-id').value.trim(),
+        chance: row.querySelector('.parent-biome-chance').value.trim(),
+        parentEdgeDistance: row.querySelector('.parent-biome-distance').value.trim(),
+    })).filter(p => p.id);
+
+    const biomeTags = Array.from(document.querySelectorAll('#biomeTagsContainer .tag-pill')).map(el => el.dataset.tag);
 
     const skyHex = document.getElementById('bioSkyColor')?.value || "#75b2ff", fogHex = document.getElementById('bioFogColor')?.value || "#e2f2ff";
 
@@ -340,6 +366,7 @@ function saveBiomeToProject(silent) {
         subFolder: window.projectData.biomes.find(b => b.id === bId)?.subFolder || "",
         chance: document.getElementById('biomeChance').value || "1.0",
         interpolation: document.getElementById('bioInterpolation').value,
+        interpolationWeight: document.getElementById('bioInterpolationWeight').value || "1.0",
         minRadius: document.getElementById('bioMinRadius').value || "256",
         maxRadius: document.getElementById('bioMaxRadius').value || "320",
         smoothBeaches: document.getElementById('bioSmoothBeaches').checked,
@@ -352,20 +379,30 @@ function saveBiomeToProject(silent) {
         mountains: document.getElementById('bioMountains').value || "0.0",
         soilCreep: document.getElementById('bioSoilCreep').value || "1.0",
         keepOriginalTerrain: document.getElementById('bioKeepOriginalTerrain').value || "1.0",
+        rivers: document.getElementById('bioRivers').checked,
+        maxSubBiomeCount: document.getElementById('bioMaxSubBiomeCount').value.trim(),
         surfaceBlock: autoNamespaceBlock(document.getElementById('bioSurfaceBlock').value),
         subBlock: autoNamespaceBlock(document.getElementById('bioSubBlock').value),
+        subMin: document.getElementById('bioSubMin').value.trim(),
+        subMax: document.getElementById('bioSubMax').value.trim(),
         stoneBlock: autoNamespaceBlock(document.getElementById('bioStoneBlock').value),
+        groundLayers,
         isCave: document.getElementById('bioIsCave').checked,
         caveLayerTag,
         caves: document.getElementById('bioCaves').value || "1.0",
         caveRadiusFactor: document.getElementById('bioCaveRadiusFactor').value || "1.0",
+        caveSmoothness: document.getElementById('bioCaveSmoothness').value || "4.0",
+        caveNoiseStrength: document.getElementById('bioCaveNoiseStrength').value || "8.0",
         crystals: document.getElementById('bioCrystals').value || "0",
         music: document.getElementById('bioMusic').value.trim() || 'cubyz:sunrise',
         fogDensity: document.getElementById('bioFogDensity').value || "1.5",
+        fogLower: document.getElementById('bioFogLower').value || "100",
+        fogHigher: document.getElementById('bioFogHigher').value || "1000",
         isValidPlayerSpawn: document.getElementById('bioSpawn').checked,
         skyColorHex: skyHex, fogColorHex: fogHex,
         skyColorVector: getHexColorAsRGBVector(skyHex), fogColorVector: getHexColorAsRGBVector(fogHex),
         properties: propertiesList, structures: structuralLayers,
+        tags: biomeTags, parentBiomes,
         climate: document.querySelector('input[name="bioTemp"]:checked')?.value,
         humidity: document.querySelector('input[name="bioWet"]:checked')?.value,
         zone: document.querySelector('input[name="bioZone"]:checked')?.value,
@@ -463,7 +500,7 @@ async function exportFullAddon() {
 
     const folders = {};
     const entityFolder = (typeof window.entityFolderForVersion === "function"
-        ? window.entityFolderForVersion(window.VERSION_PATH || "0.3.0") : "entityModels");
+        ? window.entityFolderForVersion(window.VERSION_PATH || "unreleased") : "entity_models");
     ["blocks", "items", "biomes", entityFolder, "particles", "blocks/textures", "items/textures", `${entityFolder}/textures`, "particles/textures", `${entityFolder}/models`, "world_presets", "tools", "structure_tables", "sbb", "recipes"].forEach(f => {
         const key = f === `${entityFolder}/models` ? "models" : f;
         folders[key] = addonFolder.folder(f);
@@ -604,12 +641,21 @@ async function exportFullAddon() {
             return (!c || c.includes(":") || c.includes("{")) ? c : window.projectData.blocks.some(b => b.id === c) ? `${addonName}:${c}` : `cubyz:${c}`;
         };
 
+        const numericOr = (v, fb) => { const n = parseFloat(v); return Number.isFinite(n) ? n : fb; };
+
         let bioZon = ".{\n" +
         `    .${biomeClimateFieldForVersion(window.VERSION_PATH)} = .{ ${(bio.properties || bio.climate || []).join(', ')} },\n` +
         `    .chance = ${parseFloat(bio.chance || 1).toFixed(2)},\n` +
-        `    .interpolation = ${bio.interpolation},\n` +
-        `    .minRadius = ${bio.minRadius},\n` +
-        `    .maxRadius = ${bio.maxRadius},\n` +
+        `    .interpolation = ${bio.interpolation || '.square'},\n`;
+        if (String(bio.interpolationWeight ?? "").trim() !== "" && numericOr(bio.interpolationWeight, 1) !== 1) {
+            bioZon += `    .interpolationWeight = ${numericOr(bio.interpolationWeight, 1)},\n`;
+        }
+        if (String(bio.minRadius) === String(bio.maxRadius)) {
+            bioZon += `    .radius = ${bio.minRadius},\n`;
+        } else {
+            bioZon += `    .minRadius = ${bio.minRadius},\n    .maxRadius = ${bio.maxRadius},\n`;
+        }
+        bioZon +=
         `    .smoothBeaches = ${bio.smoothBeaches},\n` +
         `    .minHeight = ${bio.minHeight},\n` +
         `    .maxHeight = ${bio.maxHeight},\n` +
@@ -622,28 +668,94 @@ async function exportFullAddon() {
         `    .keepOriginalTerrain = ${parseFloat(bio.keepOriginalTerrain || 1).toFixed(2)},\n` +
         `    .stoneBlock = "${fmtB(bio.stoneBlock)}",\n    .isCave = ${bio.isCave},\n`;
 
+        if (bio.rivers) bioZon += `    .rivers = true,\n`;
+        if (String(bio.maxSubBiomeCount ?? "").trim() !== "") bioZon += `    .maxSubBiomeCount = ${numericOr(bio.maxSubBiomeCount, 0)},\n`;
+
+        const tagSet = [];
+        (bio.tags || []).forEach(t => { const c = String(t).replace(/^\.+/, "").trim(); if (c && !tagSet.includes(c)) tagSet.push(c); });
+        if (bio.isCave && bio.caveLayerTag) { const c = bio.caveLayerTag.replace(/^\.+/, ""); if (!tagSet.includes(c)) tagSet.push(c); }
+        if (tagSet.length) bioZon += `    .tags = .{ ${tagSet.map(t => `.${t}`).join(', ')} },\n`;
+
         if (bio.isCave) {
-            bioZon += `    .caves = ${parseFloat(bio.caves || 1).toFixed(2)},\n    .caveRadiusFactor = ${parseFloat(bio.caveRadiusFactor || 1).toFixed(2)},\n    .crystals = ${bio.crystals},\n`;
-            if (bio.caveLayerTag) bioZon += `    .tags = .{.${bio.caveLayerTag.replace(/^\.+/, '')}},\n`;
+            bioZon += `    .caves = ${parseFloat(bio.caves || 1).toFixed(2)},\n    .caveRadiusFactor = ${parseFloat(bio.caveRadiusFactor || 1).toFixed(2)},\n`;
+            if (String(bio.caveSmoothness ?? "").trim() !== "" && numericOr(bio.caveSmoothness, 4) !== 4) {
+                bioZon += `    .caveSmoothness = ${numericOr(bio.caveSmoothness, 4)},\n`;
+            }
+            if (String(bio.caveNoiseStrength ?? "").trim() !== "" && numericOr(bio.caveNoiseStrength, 8) !== 8) {
+                bioZon += `    .caveNoiseStrength = ${numericOr(bio.caveNoiseStrength, 8)},\n`;
+            }
+            bioZon += `    .crystals = ${bio.crystals},\n`;
         }
-        bioZon += `    .music = "${bio.music}",\n    .fogDensity = ${parseFloat(bio.fogDensity || 1.5).toFixed(2)},\n    .fogColor = ${bio.fogColorVector},\n    .skyColor = ${bio.skyColorVector},\n    .isValidPlayerSpawn = ${bio.isValidPlayerSpawn},\n`;
+        bioZon += `    .music = "${bio.music}",\n    .fogDensity = ${parseFloat(bio.fogDensity || 1.5).toFixed(2)},\n`;
+        if (String(bio.fogLower ?? "").trim() !== "" && numericOr(bio.fogLower, 100) !== 100) {
+            bioZon += `    .fogLower = ${numericOr(bio.fogLower, 100)},\n`;
+        }
+        if (String(bio.fogHigher ?? "").trim() !== "" && numericOr(bio.fogHigher, 1000) !== 1000) {
+            bioZon += `    .fogHigher = ${numericOr(bio.fogHigher, 1000)},\n`;
+        }
+        bioZon += `    .fogColor = ${bio.fogColorVector},\n    .skyColor = ${bio.skyColorVector},\n    .validPlayerSpawn = ${!!bio.isValidPlayerSpawn},\n`;
+
+        if (bio.parentBiomes?.length) {
+            bioZon += "    .parentBiomes = .{\n";
+            bio.parentBiomes.forEach(p => {
+                bioZon += `        .{\n            .id = "${p.id}",\n            .chance = ${parseFloat(p.chance || 1).toFixed(2)},\n`;
+                if (String(p.parentEdgeDistance ?? "").trim() !== "") {
+                    bioZon += `            .parentEdgeDistance = ${numericOr(p.parentEdgeDistance, 512)},\n`;
+                }
+                bioZon += `        },\n`;
+            });
+            bioZon += "    },\n";
+        }
 
         if (bio.structures?.length) {
             bioZon += "    .structures = .{\n";
             bio.structures.forEach(s => {
                 bioZon += `        .{\n            .id = "${s.id}",\n            .chance = ${parseFloat(s.chance).toFixed(3)},\n`;
+                if (s.generationMode) bioZon += `            .generationMode = .${String(s.generationMode).replace(/^\.+/, '')},\n`;
+                if (String(s.priority ?? "").trim() !== "") bioZon += `            .priority = ${numericOr(s.priority, 1)},\n`;
                 if (s.id === 'cubyz:simple_tree') bioZon += `            .log = "${s.log}",\n            .leaves = "${s.leaves}",\n            .top = "${s.top}",\n            .type = ${s.type || '.round'},\n            .height = ${s.height},\n            .height_variation = ${s.height_variation},\n            .leafRadius = ${parseFloat(s.leafRadius || 2).toFixed(1)},\n`;
-                else if (s.id === 'cubyz:simple_vegetation') bioZon += `            .block = "${s.block}",\n            .height = ${s.height},\n`;
-                else if (s.id === 'cubyz:flower_patch') bioZon += `            .blocks = .{"${s.block}"},\n            .width = ${s.width},\n            .variation = ${s.variation},\n            .density = ${parseFloat(s.density || 0.3).toFixed(2)},\n            .priority = ${parseFloat(s.priority || 0.1).toFixed(2)},\n`;
+                else if (s.id === 'cubyz:simple_vegetation') bioZon += `            .block = "${s.block}",\n            .height = ${s.height},\n            .height_variation = ${s.height_variation || 0},\n`;
+                else if (s.id === 'cubyz:flower_patch') bioZon += `            .blocks = .{"${s.block}"},\n            .width = ${s.width},\n            .variation = ${s.variation},\n            .density = ${parseFloat(s.density || 0.3).toFixed(2)},\n`;
                 else if (s.id === 'cubyz:boulder') bioZon += `            .block = "${s.block}",\n            .size = ${s.size},\n            .size_variance = ${s.size_variance || 3},\n`;
                 else if (s.id === 'cubyz:ground_patch') bioZon += `            .block = "${s.block}",\n            .width = ${s.width},\n            .depth = ${s.depth},\n            .smoothness = ${parseFloat(s.smoothness || 0.2).toFixed(2)},\n`;
                 else if (s.id === 'cubyz:fallen_tree') bioZon += `            .log = "${s.log}",\n            .top = "${s.top}",\n            .height = ${s.height},\n            .height_variation = ${s.height_variation},\n`;
                 else if (s.id === 'cubyz:sbb') bioZon += `            .structure = "${s.structure}",\n            .placeMode = ${s.placeMode},\n`;
+                else if (s.id === 'cubyz:stalagmite') bioZon += `            .block = "${s.block}",\n            .size = ${s.size},\n            .size_variation = ${s.size_variation},\n            .baseSlope = ${s.baseSlope},\n            .topSlope = ${s.topSlope},\n`;
                 bioZon += "        },\n";
                 });
             bioZon += "    },\n";
             }
-            bioZon += `    .ground_structure = .{\n        "${fmtB(bio.surfaceBlock)}",\n        "0 to 3 ${fmtB(bio.subBlock)}",\n    },\n}`;
+
+            const groundEntries = [`"${fmtB(bio.surfaceBlock)}"`];
+            if (bio.subBlock) {
+                const subB = fmtB(bio.subBlock);
+                const mn = String(bio.subMin ?? "").trim(), mx = String(bio.subMax ?? "").trim();
+                if (mn !== "" && mx !== "" && parseFloat(mx) !== parseFloat(mn)) groundEntries.push(`"${mn} to ${mx} ${subB}"`);
+                else if (mn !== "") groundEntries.push(`"${mn} ${subB}"`);
+                else if (mx !== "") groundEntries.push(`"${mx} ${subB}"`);
+                else groundEntries.push(`"0 to 3 ${subB}"`);
+            }
+            (bio.groundLayers || []).forEach(l => {
+                const b = fmtB(l.block);
+                const mn = String(l.min ?? "").trim(), mx = String(l.max ?? "").trim();
+                if (mn !== "" && mx !== "" && parseFloat(mx) > parseFloat(mn)) groundEntries.push(`"${mn} to ${mx} ${b}"`);
+                else if (mn !== "") groundEntries.push(`"${mn} ${b}"`);
+                else if (mx !== "") groundEntries.push(`"${mx} ${b}"`);
+                else groundEntries.push(`"${b}"`);
+            });
+            bioZon += `    .ground_structure = .{\n        ${groundEntries.join(",\n        ")},\n    },\n`;
+
+            // Re-emit any top-level field the UI does not manage (caveModels,
+            // stripes, transitionBiomes, type, future fields) exactly as it was
+            // imported, so a round-trip never strips game data.
+            const managedBiomeKeys = new Set(["climate", "properties", "chance", "interpolation", "interpolationWeight", "minRadius", "maxRadius", "radius", "smoothBeaches", "minHeight", "maxHeight", "minHeightLimit", "maxHeightLimit", "roughness", "hills", "mountains", "soilCreep", "keepOriginalTerrain", "rivers", "maxSubBiomeCount", "stoneBlock", "isCave", "caves", "caveRadiusFactor", "caveSmoothness", "caveNoiseStrength", "crystals", "tags", "music", "fogDensity", "fogLower", "fogHigher", "fogColor", "skyColor", "validPlayerSpawn", "isValidPlayerSpawn", "structures", "ground_structure", "parentBiomes"]);
+            if (bio.rawBlocks) {
+                for (const [rawKey, rawText] of Object.entries(bio.rawBlocks)) {
+                    if (managedBiomeKeys.has(rawKey)) continue;
+                    bioZon += rawText.replace(/\s+$/, "") + "\n";
+                }
+            }
+            bioZon += "}";
             (bio.subFolder ? folders["biomes"].folder(bio.subFolder) : folders["biomes"]).file(`${bio.id}.zig.zon`, bioZon);
     });
 

@@ -989,7 +989,7 @@ a.comment-author:hover {
 .versions-table-header .versions-col-group {
   display: flex;
   align-items: center;
-  gap: 1.25rem;
+  gap: 0.9rem;
   flex: 1;
   min-width: 0;
 }
@@ -1004,23 +1004,24 @@ a.comment-author:hover {
   width: 6.5rem;
   flex-shrink: 0;
   text-align: center;
+  margin-right: -0.35rem;
 }
 
 .versions-table-header .versions-col-date {
   width: 10.5rem;
   flex-shrink: 0;
   text-align: center;
+  margin-right: -1.6rem;
 }
 
 .versions-table-header .versions-col-downloads {
-  width: 6.5rem;
+  width: 4.5rem;
   flex-shrink: 0;
   text-align: center;
 }
 
 .versions-table-header .versions-col-actions {
   flex-shrink: 0;
-  width: 6.5rem;
 }
 
 #versions-list {
@@ -1250,7 +1251,6 @@ a.comment-author:hover {
   font-variant-numeric: tabular-nums;
   text-shadow: none;
 }
-
 #versions-list .version-empty {
   color: var(--text-muted);
 }
@@ -1353,6 +1353,22 @@ a.comment-author:hover {
   flex-shrink: 0;
   text-align: center;
   color: var(--text-muted);
+}
+
+/* Downloads sits just after Published; pull the two together so the action
+   buttons (changelog / download / share link / delete) keep their room. */
+#versions-list .version-info {
+  gap: 0.9rem;
+}
+#versions-list .version-compat-badge,
+#versions-list .version-compat-inline-select {
+  margin-right: -0.35rem;
+}
+#versions-list .version-date {
+  margin-right: -1.6rem;
+}
+#versions-list .version-downloads {
+  width: 4.5rem;
 }
 
 .version-changelog-toggle.version-changelog-toggle-open {
@@ -2465,4 +2481,11 @@ textarea.inline-edit-input {
   #versions-list .version-row-actions button {
     height: 40px;
   }
+}
+
+/* Highlighted version when arriving via a /version/:id share link */
+.version-row-highlight {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 8px;
 }

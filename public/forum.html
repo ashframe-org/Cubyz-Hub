@@ -1,0 +1,353 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <meta name="color-scheme" content="dark">
+  <style>html { background: #101010; }</style>
+  <script>
+    (function () {
+      try {
+        const saved = localStorage.getItem("cubyzhub-theme");
+        if (saved !== "default") {
+          document.documentElement.setAttribute("data-theme", "ashframe");
+        }
+      } catch (_) {
+        document.documentElement.setAttribute("data-theme", "ashframe");
+      }
+    })();
+  </script>
+
+  <title>Forum &middot; Cubyz Hub</title>
+  <meta name="description" content="Community discussions for Cubyz — game help, addons, creation and development.">
+  <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml">
+  <link rel="icon" href="/assets/favicon.ico" sizes="any">
+  <link rel="apple-touch-icon" href="/assets/apple-touch-icon.png">
+  <link rel="alternate" type="application/atom+xml" title="CubyzHub Forum" href="/forum/feed.xml">
+
+  <link rel="stylesheet" href="/dist/buttons.css?v=20260919-17" />
+  <link rel="stylesheet" href="/dist/style.css?v=20260919-18" />
+  <link rel="stylesheet" href="/dist/ashframe-theme.css?v=20260919-17" />
+  <link rel="stylesheet" href="/forum.css?v=20260919-46" />
+</head>
+
+<body>
+  <header class="site-header">
+    <h1 class="site-title bbh-sans-hegarty-regular" onclick="location.href='/'" style="cursor:pointer;">
+      Cubyz Hub
+    </h1>
+    <div class="header-actions nav-user" id="nav-user"></div>
+    <button type="button" class="theme-toggle-btn" id="themeToggleBtn" data-theme-trigger aria-label="Toggle theme" title="Toggle theme">
+      <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <circle cx="12" cy="12" r="9"></circle>
+        <path d="M12 3a9 9 0 0 1 0 18z" fill="currentColor" stroke="none"></path>
+      </svg>
+    </button>
+  </header>
+
+  <main class="forum-page">
+    <div class="forum-shell">
+
+      <!-- Left: search + filters + tags -->
+      <aside class="forum-left" id="forumLeft" aria-label="Search and filters">
+        <div class="panel">
+          <h3 class="panel-subtitle">Search</h3>
+          <form class="search-form" id="searchForm" role="search">
+            <label class="visually-hidden" for="forumSearchInput">Search discussions</label>
+            <div class="search-field">
+              <input id="forumSearchInput" type="search" placeholder="Search discussions..." autocomplete="off">
+              <button type="button" class="search-clear" id="searchClear" hidden aria-label="Clear search">&times;</button>
+            </div>
+          </form>
+
+          <label class="forum-github-toggle">
+            <input type="checkbox" id="githubSearchToggle">
+            Include GitHub issues
+          </label>
+
+          <div class="filter-groups">
+            <div class="filter-group">
+              <h4 class="filter-group-label">Type</h4>
+              <div class="filter-pills" id="typePills" role="group" aria-label="Filter by type">
+                <button type="button" class="filter-pill active" data-type="all">All</button>
+                <button type="button" class="filter-pill" data-type="question">Question</button>
+                <button type="button" class="filter-pill" data-type="bug">Bug</button>
+                <button type="button" class="filter-pill" data-type="idea">Idea</button>
+                <button type="button" class="filter-pill" data-type="showcase">Showcase</button>
+                <button type="button" class="filter-pill" data-type="guide">Guide</button>
+                <button type="button" class="filter-pill" data-type="discussion">Discussion</button>
+              </div>
+            </div>
+
+            <div class="filter-group">
+              <h4 class="filter-group-label">Status</h4>
+              <div class="filter-pills" id="statusPills" role="group" aria-label="Filter by status">
+                <button type="button" class="filter-pill active" data-status="all">Any</button>
+                <button type="button" class="filter-pill" data-status="open">Open</button>
+                <button type="button" class="filter-pill" data-status="solved">Solved</button>
+              </div>
+            </div>
+
+            <div class="filter-group">
+              <h4 class="filter-group-label">Category</h4>
+              <nav class="cat-list" id="catList" aria-label="Categories"></nav>
+            </div>
+
+            <div class="filter-group">
+              <h4 class="filter-group-label">Popular tags</h4>
+              <div class="tag-cloud" id="tagCloud"></div>
+              <button type="button" class="link-btn" id="moreTags" hidden>More tags</button>
+            </div>
+          </div>
+        </div>
+      </aside>
+
+      <!-- Center: discussions -->
+      <section class="forum-center" aria-label="Discussions">
+
+        <div id="forumHome">
+          <div class="forum-mobile-bar">
+            <button type="button" class="btn btn-sm btn-ghost mobile-cats" data-toggle-aside="forumLeft" aria-expanded="false" aria-controls="forumLeft">Search &amp; filters</button>
+            <button type="button" class="btn btn-sm btn-ghost mobile-search" data-toggle-aside="forumRight" aria-expanded="false" aria-controls="forumRight">Recent activity</button>
+          </div>
+
+          <header class="forum-head">
+            <div>
+              <h1 id="forumHeading">Forum</h1>
+              <p class="muted" id="forumSubheading">Ask questions, share what you're building, and get help with Cubyz.</p>
+            </div>
+            <button type="button" class="btn btn-primary new-disc" id="newDiscussionBtn" aria-haspopup="dialog">
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg>
+              New Discussion
+            </button>
+          </header>
+
+          <div class="forum-toolbar">
+            <div class="filter-tabs" role="tablist" aria-label="Sort discussions">
+              <button type="button" class="filter-tab" data-filter="best" role="tab" aria-selected="false" hidden>Best match</button>
+              <button type="button" class="filter-tab active" data-filter="recent" role="tab" aria-selected="true">Recent</button>
+              <button type="button" class="filter-tab" data-filter="active" role="tab" aria-selected="false">Active</button>
+              <button type="button" class="filter-tab" data-filter="replies" role="tab" aria-selected="false">Most Replies</button>
+              <button type="button" class="filter-tab" data-filter="votes" role="tab" aria-selected="false">Most Votes</button>
+              <button type="button" class="filter-tab" data-filter="unanswered" role="tab" aria-selected="false">Unanswered</button>
+            </div>
+            <div class="view-toggle" role="group" aria-label="View">
+              <button type="button" class="view-btn active" data-view="list" aria-label="List view" aria-pressed="true">
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"></path></svg>
+              </button>
+              <button type="button" class="view-btn" data-view="grid" aria-label="Grid view" aria-pressed="false">
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1"></rect><rect x="14" y="3" width="7" height="7" rx="1"></rect><rect x="3" y="14" width="7" height="7" rx="1"></rect><rect x="14" y="14" width="7" height="7" rx="1"></rect></svg>
+              </button>
+            </div>
+          </div>
+
+          <div class="filter-chips" id="filterChips" hidden></div>
+
+          <p class="forum-status muted" id="forumStatus" hidden></p>
+
+          <div class="disc-list" id="discList"></div>
+          <section class="github-results" id="githubResults" hidden>
+            <h3 class="github-results-head">
+              <span>GitHub issues</span>
+              <a href="https://github.com/PixelGuys/Cubyz/issues" target="_blank" rel="noopener noreferrer">PixelGuys/Cubyz &#8599;</a>
+            </h3>
+            <div id="githubResultsList" class="github-list"></div>
+          </section>
+          <button type="button" class="btn btn-ghost load-more" id="loadMore" hidden>Load more</button>
+        </div>
+
+      </section>
+
+      <!-- Right: profile + recent activity -->
+      <aside class="forum-right" id="forumRight" aria-label="Profile and recent activity">
+        <div class="panel side-profile" id="sideProfile">
+          <div id="sideProfileUser" hidden>
+            <div class="side-profile-head">
+              <span class="side-profile-avatar" id="spAvatarWrap"></span>
+              <div class="side-profile-info">
+                <a class="side-profile-name" id="spName" href="#"></a>
+                <a class="side-profile-sub" id="spDashboard" href="/dashboard">Dashboard</a>
+              </div>
+            </div>
+            <button type="button" class="btn btn-primary btn-sm side-profile-new" id="sideNewDiscussion">
+              <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg>
+              New Discussion
+            </button>
+          </div>
+          <div id="sideProfileGuest" hidden>
+            <p class="muted side-profile-guest-text">Log in to start discussions, reply and vote.</p>
+            <button type="button" class="btn btn-primary btn-sm" data-open-auth>Log in / Register</button>
+          </div>
+        </div>
+
+        <div class="panel">
+          <h3 class="panel-subtitle">Top contributors</h3>
+          <ul class="contributor-list" id="contributorList"></ul>
+        </div>
+
+        <div class="panel">
+          <h3 class="panel-subtitle">Recent activity</h3>
+          <ul class="activity-list" id="activityList"></ul>
+        </div>
+
+        <div class="panel" id="reportsPanel" hidden>
+          <h3 class="panel-subtitle">Open reports</h3>
+          <ul class="reports-list" id="reportsList"></ul>
+        </div>
+
+        <div class="panel" id="moderatorsPanel" hidden>
+          <h3 class="panel-subtitle">Moderators</h3>
+          <ul class="mod-list" id="modList"></ul>
+          <form class="mod-add" id="modAddForm" autocomplete="off">
+            <div class="mod-search">
+              <label class="visually-hidden" for="modAddInput">Search users to add as moderator</label>
+              <input id="modAddInput" type="text" placeholder="Search users to add..." autocomplete="off" role="combobox" aria-expanded="false" aria-controls="modSearchResults">
+              <div class="mod-search-results" id="modSearchResults" role="listbox" hidden></div>
+            </div>
+          </form>
+        </div>
+      </aside>
+
+    </div>
+  </main>
+
+  <!-- New discussion modal -->
+  <div class="forum-modal" id="newDiscussionModal" aria-hidden="true">
+    <div class="forum-modal-box" role="dialog" aria-modal="true" aria-labelledby="newDiscussionHeading">
+      <div class="nd-head">
+        <h2 id="newDiscussionHeading">New Discussion</h2>
+        <button type="button" class="nd-close" id="ndClose" aria-label="Close">&times;</button>
+      </div>
+      <p class="nd-draft" id="ndDraft" hidden>Draft restored. <button type="button" class="link-btn" id="ndDraftDiscard">Discard draft</button></p>
+      <form id="newDiscussionForm" novalidate>
+        <div class="nd-scroll" id="ndScroll">
+        <p class="nd-error" id="ndError" role="alert" hidden></p>
+
+        <div class="field">
+          <span class="field-label" id="ndTypeLabel">What kind of post is this?</span>
+          <div class="nd-types" id="ndTypes" role="radiogroup" aria-labelledby="ndTypeLabel">
+            <button type="button" class="nd-type" data-type="question" role="radio" aria-checked="false">Question</button>
+            <button type="button" class="nd-type" data-type="bug" role="radio" aria-checked="false">Bug</button>
+            <button type="button" class="nd-type" data-type="idea" role="radio" aria-checked="false">Idea</button>
+            <button type="button" class="nd-type" data-type="showcase" role="radio" aria-checked="false">Showcase</button>
+            <button type="button" class="nd-type" data-type="guide" role="radio" aria-checked="false">Guide</button>
+            <button type="button" class="nd-type" data-type="discussion" role="radio" aria-checked="false">Discussion</button>
+          </div>
+          <input type="hidden" id="ndType" value="question">
+          <p class="field-hint" id="ndTypeHint"></p>
+        </div>
+
+        <div class="field">
+          <label for="ndTitle">Title</label>
+          <input id="ndTitle" type="text" maxlength="67" required placeholder="What would you like to discuss?">
+          <p class="field-hint nd-title-hint"><span id="ndTitleCount">0</span>/67 · at least 5 characters</p>
+        </div>
+
+        <div class="nd-similar" id="ndSimilar" hidden></div>
+
+        <div class="nd-row">
+          <div class="field">
+            <label for="ndCategory">Category</label>
+            <select id="ndCategory" class="privacy-select">
+              <option value="Game">Game</option>
+              <option value="Addons &amp; Mods">Addons &amp; Mods</option>
+              <option value="Creation">Creation</option>
+              <option value="Development">Development</option>
+              <option value="General" selected>General</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="ndTags">Tags <span class="muted">(comma separated)</span></label>
+            <input id="ndTags" type="text" list="tagSuggestions" placeholder="bug, performance">
+            <datalist id="tagSuggestions"></datalist>
+          </div>
+        </div>
+
+        <div class="field">
+          <div class="nd-body-head">
+            <label for="ndBody">Body <span class="muted">(Markdown supported, min 120 characters)</span></label>
+            <button type="button" class="link-btn" id="ndPreviewToggle">Preview</button>
+          </div>
+          <div class="md-toolbar" id="ndToolbar" role="toolbar" aria-label="Formatting">
+            <button type="button" data-md="bold" title="Bold (Ctrl+B)"><strong>B</strong></button>
+            <button type="button" data-md="italic" title="Italic (Ctrl+I)"><em>I</em></button>
+            <button type="button" data-md="strike" title="Strikethrough"><s>S</s></button>
+            <button type="button" data-md="heading" title="Heading">H</button>
+            <button type="button" data-md="link" title="Link (Ctrl+K)">Link</button>
+            <button type="button" data-md="ulist" title="Bulleted list">List</button>
+            <button type="button" data-md="olist" title="Numbered list">1.</button>
+            <button type="button" data-md="quote" title="Quote">&quot;</button>
+            <button type="button" data-md="code" title="Inline code">&lt;/&gt;</button>
+            <button type="button" data-md="codeblock" title="Code block">{ }</button>
+            <button type="button" data-md="image" title="Upload an image">Image</button>
+            <button type="button" data-md="hr" title="Divider">&mdash;</button>
+          </div>
+          <textarea id="ndBody" rows="6" placeholder="Describe your issue or idea. Markdown is supported."></textarea>
+          <div class="md-preview" id="ndPreview" hidden></div>
+        </div>
+        </div>
+
+        <div class="forum-modal-actions">
+          <button type="button" class="btn btn-ghost" id="ndCancel">Cancel</button>
+          <button type="submit" class="btn btn-primary" id="ndSubmit">Post Discussion</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div class="forum-notice-overlay" id="forumNotice" hidden>
+    <div class="forum-notice" role="dialog" aria-modal="true" aria-labelledby="forumNoticeTitle">
+      <h3 id="forumNoticeTitle">Welcome to the forum</h3>
+      <p>The forum is still pretty new and we're actively building it, so expect some rough edges. If you spot a bug or have an idea, we'd love to hear it.</p>
+      <div class="forum-notice-actions">
+        <a class="btn btn-ghost" href="/feedback">Send feedback</a>
+        <button type="button" class="btn btn-primary" id="forumNoticeClose">Got it</button>
+      </div>
+    </div>
+  </div>
+
+  <footer class="site-footer">
+    <div class="site-footer-columns">
+      <div class="site-footer-col">
+        <h3>Browse</h3>
+        <a href="/addons">Addons &amp; Mods</a>
+        <a href="/models">Models</a>
+        <a href="/servers">Servers</a>
+        <a href="/changelog">Changelog</a>
+      </div>
+      <div class="site-footer-col">
+        <h3>Create</h3>
+        <a href="/upload.html">Upload</a>
+        <a href="/creator/">Addon Creator</a>
+        <a href="/dashboard">Dashboard</a>
+      </div>
+      <div class="site-footer-col">
+        <h3>Community</h3>
+        <a href="/forum">Forum</a>
+        <a href="/feedback">Feedback</a>
+        <a href="/metrics">Metrics</a>
+        <a href="https://discord.gg/QsjZnQzEsc" target="_blank" rel="noopener noreferrer">Discord Server</a>
+        <a href="https://github.com/ashframe-org/cubyz-hub" target="_blank" rel="noopener noreferrer">Open Source</a>
+      </div>
+    </div>
+    <div class="site-footer-divider"></div>
+    <div class="site-footer-row">
+      <p class="site-footer-blurb">CubyzHub is a community-run platform for Cubyz addons and mods, not an official Cubyz service.</p>
+      <span class="site-footer-credit">Cubyz Hub &middot; by iNiKKo &copy; 2025-2026</span>
+    </div>
+  </footer>
+
+  <script src="/vendor/simplewebauthn-browser.umd.min.js"></script>
+  <script src="/vendor/marked.umd.js?v=20260919-17"></script>
+  <script src="/vendor/purify.min.js?v=20260919-17"></script>
+  <script src="/theme-toggle.js?v=20260919-17"></script>
+  <script src="/toast.js?v=20260919-17"></script>
+  <script type="module" src="/dist/auth.js?v=20260919-22"></script>
+  <script src="/forum-gallery.js?v=20260919-03"></script>
+  <script type="module" src="/forum-markdown.js?v=20260919-03"></script>
+  <script src="/forum-editor.js?v=20260919-06"></script>
+  <script src="/forum.js?v=20260919-39"></script>
+</body>
+
+</html>

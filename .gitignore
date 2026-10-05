@@ -55,3 +55,6 @@ public/assets/apple-touch-icon.png
 public/assets/ashframe-mark.svg
 # Cubyz game asset (third-party, GPL-3.0) - not ours to publish
 public/assets/Snale_Avatar.webp
+
+# Local-only ops/handoff notes (deploy paths, backups): not published.
+IMPROVEMENTS.md

@@ -121,6 +121,28 @@ const uploadBanner = multer({
   }
 });
 
+const forumImageStorage = multer.diskStorage({
+  destination: function (req, file, cb) {
+    const dir = path.join(process.cwd(), "uploads", "forum", String(req.session?.user?.id || "anon"));
+    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+    cb(null, dir);
+  },
+  filename: function (req, file, cb) {
+    const ext = path.extname(file.originalname).toLowerCase() || ".png";
+    cb(null, crypto.randomBytes(16).toString("hex") + ext);
+  }
+});
+
+const uploadForumImage = multer({
+  storage: forumImageStorage,
+  limits: { fileSize: MAX_IMAGE_BYTES },
+  fileFilter: (req, file, cb) => {
+    const ext = path.extname(file.originalname).toLowerCase();
+    if (allowedImageExts.includes(ext)) return cb(null, true);
+    return cb(new Error("Invalid image type"));
+  }
+});
+
 const MAX_MODEL_FILE_BYTES = 50 * 1024 * 1024;
 const modelStorage = multer.diskStorage({
   destination: function (req, file, cb) {
@@ -195,7 +217,7 @@ const uploadServerIcon = multer({
   }
 });
 
-export { upload, uploadAvatar, uploadChangelogScreenshots, uploadBanner, uploadModel, uploadServerIcon };
+export { upload, uploadAvatar, uploadChangelogScreenshots, uploadBanner, uploadModel, uploadServerIcon, uploadForumImage };
 
 const MAGIC_PNG = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a];
 const MAGIC_JPG = [0xff, 0xd8, 0xff];

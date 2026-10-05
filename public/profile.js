@@ -638,39 +638,260 @@ function setupProfileTabs() {
       tabs.forEach((t) => t.classList.toggle("active", t === tab));
       document.getElementById("profile-tab-addons")?.classList.toggle("active", which === "addons");
       document.getElementById("profile-tab-models")?.classList.toggle("active", which === "models");
+      document.getElementById("profile-tab-servers")?.classList.toggle("active", which === "servers");
+      document.getElementById("profile-tab-forum")?.classList.toggle("active", which === "forum");
+
+      if (which === "models") {
+        requestAnimationFrame(() => {
+          ensureThree()
+            .then(() => {
+              initProfileModelViewers();
+              resumeProfileViewers();
+            })
+            .catch(() => {});
+        });
+      } else {
+        pauseProfileViewers();
+      }
     });
   });
 }
 
-function renderProfileModel(model) {
-  const card = document.createElement("a");
-  card.className = "model-card fade-in-card";
-  card.href = `/models?model=${encodeURIComponent(model.id)}`;
-  card.innerHTML = `
-    <div class="model-card-header">${escapeHtml(model.title)}</div>
-    <div class="model-card-thumb">
-      <img class="img-fade" src="${escapeHtml(safeUrl(model.texture_path, "/assets/default_icon.png"))}" alt="${escapeHtml(model.title)}">
-    </div>
-    <div class="model-card-footer">${model.asset_type === "skin_only" ? "Skin" : "Full model"}</div>
-  `;
+function profileForumHref(t) {
+  const slug = String(t.title || "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 60);
+  return `/forum/t/${t.id}${slug ? "-" + slug : ""}`;
+}
 
-  const img = card.querySelector("img.img-fade");
-  if (img) {
-    const reveal = () => img.classList.add("loaded");
-    if (img.complete && img.naturalWidth > 0) reveal();
-    else {
-      img.addEventListener("load", reveal, { once: true });
-      img.addEventListener("error", reveal, { once: true });
-    }
+function renderProfileForum(threads) {
+  const list = document.getElementById("profile-forum-list");
+  const noForum = document.getElementById("no-forum");
+  if (!list) return;
+  list.innerHTML = "";
+  const items = Array.isArray(threads) ? threads : [];
+  if (!items.length) {
+    if (noForum) noForum.classList.remove("hidden");
+    return;
   }
+  if (noForum) noForum.classList.add("hidden");
+  items.forEach((t) => {
+    const li = document.createElement("li");
+    li.className = "profile-forum-item";
 
-  return card;
+    const a = document.createElement("a");
+    a.className = "profile-forum-link";
+    a.href = profileForumHref(t);
+    a.textContent = t.title;
+    li.appendChild(a);
+
+    const bits = [t.category];
+    if (t.solved) bits.push("Solved");
+    if (t.pinned) bits.push("Pinned");
+    bits.push(`${t.votes || 0} votes`);
+    bits.push(`${t.replyCount || 0} replies`);
+    const meta = document.createElement("div");
+    meta.className = "profile-forum-meta";
+    meta.textContent = bits.join(" \u00b7 ");
+    li.appendChild(meta);
+
+    list.appendChild(li);
+  });
+}
+
+function renderProfileServers(servers) {
+  const list = document.getElementById("profile-server-list");
+  const noServers = document.getElementById("no-servers");
+  if (!list) return;
+  list.innerHTML = "";
+  const items = Array.isArray(servers) ? servers : [];
+  if (!items.length) {
+    if (noServers) noServers.classList.remove("hidden");
+    return;
+  }
+  if (noServers) noServers.classList.add("hidden");
+  items.forEach((s) => {
+    const li = document.createElement("li");
+    li.className = "profile-server-item";
+
+    const icon = document.createElement("img");
+    icon.className = "profile-server-icon";
+    icon.src = safeUrl(s.icon_url, "/assets/default_icon.png");
+    icon.alt = "";
+    icon.loading = "lazy";
+    li.appendChild(icon);
+
+    const info = document.createElement("div");
+    info.className = "profile-server-info";
+
+    const a = document.createElement("a");
+    a.className = "profile-server-link";
+    a.href = `/server.html?id=${encodeURIComponent(s.id)}`;
+    a.textContent = s.name;
+    info.appendChild(a);
+
+    const status = s.online
+      ? `Online${typeof s.player_count === "number" ? " \u00b7 " + s.player_count + " players" : ""}`
+      : "Offline";
+    const meta = document.createElement("div");
+    meta.className = "profile-server-meta";
+    meta.textContent = [status, s.version].filter(Boolean).join(" \u00b7 ");
+    info.appendChild(meta);
+
+    if (s.description) {
+      const desc = document.createElement("p");
+      desc.className = "profile-server-desc";
+      desc.textContent = s.description;
+      info.appendChild(desc);
+    }
+
+    li.appendChild(info);
+    list.appendChild(li);
+  });
+}
+
+const OFFICIAL_MODEL_BASES = {
+  "cubyz:snale": { glb: "/models-official/snale.glb?v=20261004-1", texture: "/models-official/snale.png", rotateX: false, offsetY: Math.PI },
+  "cubyz:snela": { glb: "/models-official/snela.glb?v=20261004-1", texture: "/models-official/snela.png", rotateX: false, offsetY: Math.PI },
+  "cubyz:snail": { glb: "/models-official/snail.glb?v=20261004-1", texture: "/models-official/snail.png", rotateX: false, offsetY: 0 },
+  "cubyz:moffalo": { glb: "/models-official/moffalo.glb?v=20261004-1", texture: "/models-official/moffalo.png", rotateX: false, offsetY: 0 },
+  "cubyz:cubert": { glb: "/models-official/cubert.glb?v=20261004-1", texture: "/models-official/cubert.png", rotateX: false, offsetY: Math.PI },
+};
+
+const profileModels = [];
+const profileViewers = [];
+let threeLoadPromise = null;
+
+function profileModelRenderInfo(model) {
+  if (model.asset_type === "skin_only") {
+    const base = OFFICIAL_MODEL_BASES[model.associated_model];
+    if (!base) return null;
+    return { glb: base.glb, texture: model.texture_path || base.texture, rotateX: base.rotateX, offsetY: base.offsetY };
+  }
+  if (!model.glb_path) return null;
+  return { glb: model.glb_path, texture: model.texture_path, rotateX: false, offsetY: 0 };
+}
+
+// three.js is heavy, so only load it the first time the Models tab is opened.
+function ensureThree() {
+  if (window.THREE && window.THREE.GLTFLoader) return Promise.resolve();
+  if (threeLoadPromise) return threeLoadPromise;
+  threeLoadPromise = new Promise((resolve, reject) => {
+    const three = document.createElement("script");
+    three.src = "/vendor/three-r128.min.js";
+    three.onload = () => {
+      const gltf = document.createElement("script");
+      gltf.src = "/vendor/GLTFLoader-r128.js";
+      gltf.onload = () => resolve();
+      gltf.onerror = () => reject(new Error("GLTFLoader failed to load"));
+      document.head.appendChild(gltf);
+    };
+    three.onerror = () => reject(new Error("three.js failed to load"));
+    document.head.appendChild(three);
+  });
+  return threeLoadPromise;
+}
+
+// Renders a rotating 3D preview into a container (mirrors models.js viewer).
+function initProfileViewer(container, info) {
+  if (!container || !window.THREE || container.dataset.viewerInit === "1") return;
+  container.dataset.viewerInit = "1";
+
+  const width = container.clientWidth || 220;
+  const height = container.clientHeight || 220;
+  const scene = new THREE.Scene();
+  const camera = new THREE.PerspectiveCamera(45, width / Math.max(1, height), 0.1, 100);
+  camera.position.set(0, 0.2, 3.5);
+
+  const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+  renderer.setSize(width, height);
+  renderer.setPixelRatio(window.devicePixelRatio || 1);
+  if (THREE.sRGBEncoding) renderer.outputEncoding = THREE.sRGBEncoding;
+  container.innerHTML = "";
+  container.appendChild(renderer.domElement);
+
+  scene.add(new THREE.AmbientLight(0xffffff, 0.9));
+  const dir = new THREE.DirectionalLight(0xffffff, 0.7);
+  dir.position.set(5, 10, 7.5);
+  scene.add(dir);
+
+  const record = { animId: null, renderer, animate: null };
+  profileViewers.push(record);
+
+  const loader = new THREE.GLTFLoader();
+  loader.load(encodeURI(info.glb), (gltf) => {
+    const model = gltf.scene;
+    if (info.rotateX) model.rotation.x = -Math.PI / 2;
+    model.rotation.y = info.offsetY || 0;
+
+    if (info.texture) {
+      new THREE.TextureLoader().load(encodeURI(info.texture), (texture) => {
+        texture.flipY = false;
+        if (THREE.sRGBEncoding) texture.encoding = THREE.sRGBEncoding;
+        texture.magFilter = THREE.NearestFilter;
+        texture.minFilter = THREE.NearestFilter;
+        model.traverse((child) => {
+          if (child.isMesh) {
+            child.material = new THREE.MeshBasicMaterial({
+              map: texture,
+              transparent: true,
+              alphaTest: 0.5,
+              side: THREE.DoubleSide,
+            });
+            child.material.needsUpdate = true;
+          }
+        });
+      });
+    }
+
+    const box = new THREE.Box3().setFromObject(model);
+    const center = box.getCenter(new THREE.Vector3());
+    model.position.sub(center);
+    scene.add(model);
+
+    function animate() {
+      record.animId = requestAnimationFrame(animate);
+      if (info.rotateX) model.rotation.z += 0.004;
+      else model.rotation.y += 0.004;
+      renderer.render(scene, camera);
+    }
+    record.animate = animate;
+    animate();
+  });
+}
+
+function initProfileModelViewers() {
+  document.querySelectorAll("#model-container .model-canvas-container").forEach((container) => {
+    const index = parseInt(container.dataset.index, 10);
+    const info = profileModels[index];
+    if (!info || !info.glb) return;
+    initProfileViewer(container, info);
+  });
+}
+
+function pauseProfileViewers() {
+  profileViewers.forEach((v) => {
+    if (v.animId) {
+      cancelAnimationFrame(v.animId);
+      v.animId = null;
+    }
+  });
+}
+
+function resumeProfileViewers() {
+  profileViewers.forEach((v) => {
+    if (!v.animId && typeof v.animate === "function") v.animate();
+  });
 }
 
 function renderProfileModels(models) {
   const modelContainer = document.getElementById("model-container");
   const noModels = document.getElementById("no-models");
   if (!modelContainer) return;
+
+  profileModels.length = 0;
 
   if (!Array.isArray(models) || models.length === 0) {
     modelContainer.classList.add("hidden");
@@ -681,7 +902,37 @@ function renderProfileModels(models) {
   if (noModels) noModels.classList.add("hidden");
   modelContainer.classList.remove("hidden");
   modelContainer.innerHTML = "";
-  models.forEach((model) => modelContainer.appendChild(renderProfileModel(model)));
+
+  models.forEach((model, index) => {
+    const info = profileModelRenderInfo(model);
+    profileModels[index] = info;
+
+    const card = document.createElement("a");
+    card.className = "model-card fade-in-card";
+    card.href = `/models?model=${encodeURIComponent(model.id)}`;
+    card.innerHTML = `
+      <div class="model-card-header">${escapeHtml(model.title)}</div>
+      <div class="model-canvas-container" data-index="${index}"></div>
+      <div class="model-card-footer">${model.asset_type === "skin_only" ? "Skin" : "Full model"}</div>
+    `;
+
+    const holder = card.querySelector(".model-canvas-container");
+    if (!info) {
+      // No GLB to render — fall back to the texture image.
+      holder.dataset.viewerInit = "1";
+      holder.innerHTML = `<img class="img-fade loaded" src="${escapeHtml(safeUrl(model.texture_path, "/assets/default_icon.png"))}" alt="${escapeHtml(model.title)}">`;
+    }
+
+    modelContainer.appendChild(card);
+  });
+
+  if (isProfileTabActive("models")) {
+    ensureThree().then(initProfileModelViewers).catch(() => {});
+  }
+}
+
+function isProfileTabActive(which) {
+  return !!document.getElementById(`profile-tab-${which}`)?.classList.contains("active");
 }
 
 function setupCommunityTabs(username) {
@@ -725,9 +976,16 @@ async function loadProfile() {
     document.title = `${user.username} • Cubyz Hub`;
     setText("profile-name", user.username);
     setText("profile-handle", `@${user.username}`);
-    setText("profile-addons-count", formatNumber(stats.totalAddons || 0));
-    setText("profile-downloads-count", formatNumber(stats.totalDownloads || 0));
-    setText("profile-joined-date", `Joined ${formatDate(user.created_at)}`);
+    setText("tab-count-addons", formatNumber((stats.totalAddons || 0) + (stats.totalMods || 0)));
+    setText("tab-count-models", formatNumber(stats.totalModels || 0));
+    setText("tab-count-servers", formatNumber(stats.totalServers || 0));
+    setText("tab-count-forum", formatNumber(stats.totalForumThreads || 0));
+    setText("stat-downloads", formatNumber(stats.totalDownloads || 0));
+    setText("stat-forum-threads", formatNumber(stats.totalForumThreads || 0));
+    setText("stat-forum-replies", formatNumber(stats.totalForumReplies || 0));
+    setText("stat-likes", formatNumber(stats.totalLikes || 0));
+    setText("stat-servers", formatNumber(stats.totalServers || 0));
+    setText("profile-joined-date", `Member since ${formatDate(user.created_at)}`);
     setText("stat-addons", formatNumber(stats.totalAddons || 0));
     setText("stat-downloads", formatNumber(stats.totalDownloads || 0));
     setText("stat-joined", formatDate(user.created_at));
@@ -749,6 +1007,23 @@ async function loadProfile() {
     setupCommunityTabs(user.username);
     setupProfileTabs();
     renderProfileModels(data.models);
+    renderProfileForum(data.forumThreads);
+    renderProfileServers(data.servers);
+    const roleBadge = document.getElementById("profile-role-badge");
+    if (roleBadge) {
+      if (data.isForumAdmin) {
+        roleBadge.textContent = "Admin";
+        roleBadge.classList.remove("hidden");
+      } else if (data.isForumModerator) {
+        roleBadge.textContent = "Moderator";
+        roleBadge.classList.remove("hidden");
+      }
+    }
+    if (data.forumHidden) {
+      document.querySelector('[data-profile-tab="forum"]')?.classList.add("hidden");
+      document.getElementById("profile-tab-forum")?.classList.add("hidden");
+      document.getElementById("profile-forum-count")?.closest(".profile-stat")?.classList.add("hidden");
+    }
 
     const avatarEl = document.getElementById("profile-avatar");
     if (avatarEl) {

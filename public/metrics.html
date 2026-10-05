@@ -1,0 +1,136 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <meta name="color-scheme" content="dark">
+  <style>html { background: #101010; }</style>
+  <script>
+    (function () {
+      try {
+        const saved = localStorage.getItem("cubyzhub-theme");
+        if (saved !== "default") {
+          document.documentElement.setAttribute("data-theme", "ashframe");
+        }
+      } catch (_) {
+        document.documentElement.setAttribute("data-theme", "ashframe");
+      }
+    })();
+  </script>
+
+  <title>Metrics &middot; Cubyz Hub</title>
+  <meta name="description" content="Cubyz Hub community metrics: active users, downloads, uploads and other trends over time.">
+  <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml">
+  <link rel="icon" href="/assets/favicon.ico" sizes="any">
+  <link rel="apple-touch-icon" href="/assets/apple-touch-icon.png">
+
+  <link rel="stylesheet" href="dist/buttons.css?v=20260919-17" />
+  <link rel="stylesheet" href="dist/style.css?v=20260919-18" />
+  <link rel="stylesheet" href="dist/ashframe-theme.css?v=20260919-17" />
+  <link rel="stylesheet" href="metrics.css?v=20260919-23" />
+</head>
+
+<body>
+  <header class="site-header">
+    <h1 class="site-title bbh-sans-hegarty-regular" onclick="location.href='/'" style="cursor:pointer;">
+      Cubyz Hub
+    </h1>
+    <div class="header-actions nav-user" id="nav-user"></div>
+    <button type="button" class="theme-toggle-btn" id="themeToggleBtn" data-theme-trigger aria-label="Toggle theme" title="Toggle theme">
+      <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <circle cx="12" cy="12" r="9"></circle>
+        <path d="M12 3a9 9 0 0 1 0 18z" fill="currentColor" stroke="none"></path>
+      </svg>
+    </button>
+  </header>
+
+  <main class="metrics-main">
+    <section class="metrics-hero">
+      <h2>By the numbers</h2>
+      <p class="muted" id="metricsSince">Loading&hellip;</p>
+    </section>
+
+    <section class="metrics-live" id="metricsLive" aria-live="polite"></section>
+
+    <section class="metrics-totals-wrap" id="metricsTotals"></section>
+
+    <section class="metrics-chart-card">
+      <div class="metrics-chart-head">
+        <h3 id="metricsChartTitle">Downloads</h3>
+        <div class="metrics-range" role="group" aria-label="Time range">
+          <button type="button" data-range="30" class="active">30 days</button>
+          <button type="button" data-range="90">90 days</button>
+          <button type="button" data-range="12m">12 months</button>
+        </div>
+      </div>
+      <div class="metrics-metric-tabs" id="metricsMetricTabs" role="group" aria-label="Metric">
+        <button type="button" data-metric="downloads" class="active">Downloads</button>
+        <button type="button" data-metric="newUsers">New users</button>
+        <button type="button" data-metric="activeUsers">Active users</button>
+        <button type="button" data-metric="uploads">Uploads</button>
+        <button type="button" data-metric="comments">Comments</button>
+        <button type="button" data-metric="likes">Likes</button>
+        <button type="button" data-metric="forumThreads">Forum threads</button>
+        <button type="button" data-metric="forumReplies">Forum replies</button>
+      </div>
+      <div class="metrics-chart-wrap">
+        <svg id="metricsChart" viewBox="0 0 720 260" width="720" height="260" role="img" aria-label="Trend chart"></svg>
+        <div class="metrics-tooltip" hidden></div>
+      </div>
+      <p class="metrics-chart-note" id="metricsChartNote"></p>
+    </section>
+
+    <section class="metrics-chart-card">
+      <div class="metrics-chart-head">
+        <h3>New users &amp; active users</h3>
+      </div>
+      <div class="metrics-chart-wrap">
+        <svg id="metricsUsersChart" viewBox="0 0 720 260" width="720" height="260" role="img" aria-label="New and active users chart"></svg>
+        <div class="metrics-tooltip" hidden></div>
+      </div>
+      <p class="metrics-chart-note">Bars are new signups; the line is unique active users for the same period.</p>
+    </section>
+
+    <p class="metrics-disclaimer muted">Metrics are recorded from the day tracking started and update every few minutes. Counts are approximate: downloads are de-duplicated per visitor, and "active" means a signed-in user seen within 5 minutes.</p>
+  </main>
+
+  <footer class="site-footer">
+    <div class="site-footer-columns">
+            <div class="site-footer-col">
+        <h3>Browse</h3>
+        <a href="/addons">Addons &amp; Mods</a>
+        <a href="/models">Models</a>
+        <a href="/servers">Servers</a>
+        <a href="/changelog">Changelog</a>
+      </div>
+      <div class="site-footer-col">
+        <h3>Create</h3>
+        <a href="/upload.html">Upload</a>
+        <a href="/creator/">Addon Creator</a>
+        <a href="/dashboard">Dashboard</a>
+      </div>
+      <div class="site-footer-col">
+        <h3>Community</h3>
+        <a href="/forum">Forum</a>
+        <a href="/feedback">Feedback</a>
+        <a href="/metrics">Metrics</a>
+        <a href="https://discord.gg/QsjZnQzEsc" target="_blank" rel="noopener noreferrer">Discord Server</a>
+        <a href="https://github.com/ashframe-org/cubyz-hub" target="_blank" rel="noopener noreferrer">Open Source</a>
+      </div>
+    </div>
+    <div class="site-footer-divider"></div>
+    <div class="site-footer-row">
+      <p class="site-footer-blurb">CubyzHub is a community-run platform for Cubyz addons and mods, not an official Cubyz service.</p>
+      <span class="site-footer-credit">Cubyz Hub &middot; by iNiKKo &copy; 2025-2026</span>
+    </div>
+  </footer>
+
+  <script src="vendor/simplewebauthn-browser.umd.min.js"></script>
+  <script src="theme-toggle.js?v=20260919-17"></script>
+  <script src="toast.js?v=20260919-17"></script>
+  <script type="module" src="dist/auth.js?v=20260919-22"></script>
+  <script src="metrics.js?v=20260919-25"></script>
+</body>
+
+</html>

@@ -168,7 +168,9 @@ async function loadUserModels() {
     }
 
     modelEmptyState.classList.add("hidden");
-    json.models.forEach((m) => {
+    if (window.ModelViewer) window.ModelViewer.disposeAll();
+    modelGrid.innerHTML = "";
+    json.models.forEach((m, idx) => {
       const isDraft = m.status === "draft";
       const card = document.createElement("article");
       card.className = "model-card fade-in-card";
@@ -177,9 +179,7 @@ async function loadUserModels() {
         ${escapeHtml(m.title)}
         ${isDraft ? '<span class="model-draft-badge">Draft</span>' : ""}
       </div>
-      <div class="model-card-thumb">
-        <img class="img-fade" src="${escapeHtml(m.texture_path)}" alt="${escapeHtml(m.title)}">
-      </div>
+      <div class="model-card-thumb" id="dash-model-canvas-${idx}"></div>
       <div class="model-card-footer">
         <div class="model-card-actions">
           ${isDraft ? `<button class="btn btn-ghost btn-sm model-publish-btn" data-id="${m.id}">Publish</button>` : ""}
@@ -189,17 +189,10 @@ async function loadUserModels() {
       </div>
       `;
 
-      const cardIcon = card.querySelector("img.img-fade");
-      if (cardIcon) {
-        const reveal = () => cardIcon.classList.add("loaded");
-        if (cardIcon.complete && cardIcon.naturalWidth > 0) reveal();
-        else {
-          cardIcon.addEventListener("load", reveal, { once: true });
-          cardIcon.addEventListener("error", reveal, { once: true });
-        }
-      }
-
       modelGrid.appendChild(card);
+      if (window.ModelViewer) {
+        window.ModelViewer.mount(document.getElementById(`dash-model-canvas-${idx}`), m);
+      }
     });
 
     modelGrid.querySelectorAll(".model-delete-btn").forEach((b) =>
@@ -295,6 +288,15 @@ async function loadUserServers() {
         </div>
       </div>
       `;
+      const serverIcon = card.querySelector("img.img-fade");
+      if (serverIcon) {
+        const reveal = () => serverIcon.classList.add("loaded");
+        if (serverIcon.complete && serverIcon.naturalWidth > 0) reveal();
+        else {
+          serverIcon.addEventListener("load", reveal, { once: true });
+          serverIcon.addEventListener("error", reveal, { once: true });
+        }
+      }
       serverManageGrid.appendChild(card);
     });
 
@@ -354,33 +356,90 @@ async function loadUserServers() {
   }
 }
 
-function initCollapsiblePanel(heroId, panelId) {
-  const hero = document.getElementById(heroId);
-  const panel = document.getElementById(panelId);
-  if (!hero || !panel) return;
+async function loadUserForum() {
+  const list = document.getElementById("forumList");
+  const empty = document.getElementById("forumEmptyState");
+  if (!list) return;
+  try {
+    const res = await fetch("/api/user/forum", { credentials: "include" });
+    const json = await res.json();
+    if (!json.ok) return;
+    const threads = json.threads || [];
+    list.innerHTML = "";
+    if (!threads.length) {
+      if (empty) empty.classList.remove("hidden");
+      return;
+    }
+    if (empty) empty.classList.add("hidden");
+    threads.forEach((t) => {
+      const li = document.createElement("li");
+      li.className = "dash-forum-item";
 
-  function toggle() {
-    const willOpen = panel.classList.contains("hidden");
-    panel.classList.toggle("hidden", !willOpen);
-    hero.setAttribute("aria-expanded", String(willOpen));
+      const a = document.createElement("a");
+      a.className = "dash-forum-link";
+      a.href = `/forum/t/${t.id}`;
+      a.textContent = t.title;
+      li.appendChild(a);
+
+      const bits = [t.category];
+      if (t.hidden) bits.push("Hidden");
+      if (t.pinned) bits.push("Pinned");
+      if (t.solved) bits.push("Solved");
+      bits.push(`${t.votes || 0} votes`);
+      bits.push(`${t.replyCount || 0} replies`);
+      const meta = document.createElement("div");
+      meta.className = "dash-forum-meta";
+      meta.textContent = bits.join(" \u00b7 ");
+      li.appendChild(meta);
+
+      list.appendChild(li);
+    });
+  } catch (err) {
+    console.error("Failed to load forum posts:", err);
+  }
+}
+
+function wireUploadFilter() {
+  const input = document.getElementById("uploadsFilter");
+  if (!input) return;
+  input.addEventListener("input", () => {
+    const q = input.value.trim().toLowerCase();
+    document.querySelectorAll("#addonGrid .user-addon-card").forEach((card) => {
+      const name = (card.querySelector("h4")?.textContent || "").toLowerCase();
+      card.style.display = !q || name.includes(q) ? "" : "none";
+    });
+  });
+}
+
+function setupContentTabs() {
+  const tabs = Array.from(document.querySelectorAll(".content-tab"));
+  if (!tabs.length) return;
+
+  function activate(which) {
+    tabs.forEach((t) => {
+      const on = t.dataset.contentTab === which;
+      t.classList.toggle("active", on);
+      t.setAttribute("aria-selected", on ? "true" : "false");
+    });
+    document.querySelectorAll(".content-panel").forEach((panel) => {
+      panel.classList.toggle("active", panel.id === `content-panel-${which}`);
+    });
+    if (history.replaceState) history.replaceState(null, "", `#${which}`);
   }
 
-  hero.addEventListener("click", toggle);
-  hero.addEventListener("keydown", (e) => {
-    if (e.key === "Enter" || e.key === " ") {
-      e.preventDefault();
-      toggle();
-    }
-  });
+  tabs.forEach((t) => t.addEventListener("click", () => activate(t.dataset.contentTab)));
+
+  const initial = (location.hash || "").replace("#", "");
+  if (tabs.some((t) => t.dataset.contentTab === initial)) activate(initial);
 }
 
 window.addEventListener("DOMContentLoaded", () => {
   loadUserAddons();
   loadUserModels();
   loadUserServers();
-  initCollapsiblePanel("uploadsHero", "uploadsPanel");
-  initCollapsiblePanel("modelsHero", "modelsPanel");
-  initCollapsiblePanel("serversHero", "serversPanel");
+  loadUserForum();
+  setupContentTabs();
+  wireUploadFilter();
 
   const goUpload = document.getElementById("goUpload");
   if (goUpload) {
@@ -513,6 +572,99 @@ const deleteAccountUsernameLabel = document.getElementById("deleteAccountUsernam
 
 let currentUsername = null;
 
+const USAGE_COLORS = {
+  addons: "#6ea8fe",
+  models: "#f7b955",
+  servers: "#4dd4ac",
+  creator: "#c792ea",
+  profile: "#ff8fab",
+  changelog: "#9aa0a6",
+};
+
+function formatBytes(bytes) {
+  const n = Number(bytes) || 0;
+  if (n < 1024) return `${n} B`;
+  const units = ["KB", "MB", "GB", "TB"];
+  let value = n / 1024;
+  let i = 0;
+  while (value >= 1024 && i < units.length - 1) {
+    value /= 1024;
+    i++;
+  }
+  return `${value.toFixed(value >= 100 ? 0 : value >= 10 ? 1 : 2)} ${units[i]}`;
+}
+
+async function loadUsageStats() {
+  const bar = document.getElementById("usageBar");
+  if (!bar) return;
+  try {
+    const res = await fetch("/api/user/usage", { credentials: "include" });
+    if (res.status === 401) return;
+    const json = await res.json();
+    if (!json.ok) return;
+    renderUsage(json);
+  } catch (err) {
+    console.error("Failed to load usage stats:", err);
+  }
+}
+
+function renderUsage(data) {
+  const bar = document.getElementById("usageBar");
+  const legend = document.getElementById("usageLegend");
+  const totalEl = document.getElementById("usageTotal");
+  const itemsEl = document.getElementById("usageTotalItems");
+  const emptyEl = document.getElementById("usageEmpty");
+  if (!bar || !legend) return;
+
+  const categories = Array.isArray(data.categories) ? data.categories : [];
+  const totalBytes = data.totalBytes || 0;
+  const totalItems = data.totalItems || 0;
+
+  bar.innerHTML = "";
+  legend.innerHTML = "";
+
+  if (!categories.length) {
+    if (emptyEl) emptyEl.hidden = false;
+    if (totalEl) totalEl.textContent = "0 B";
+    if (itemsEl) itemsEl.textContent = "";
+    return;
+  }
+  if (emptyEl) emptyEl.hidden = true;
+  if (totalEl) totalEl.textContent = formatBytes(totalBytes);
+  if (itemsEl) itemsEl.textContent = `across ${totalItems} item${totalItems === 1 ? "" : "s"}`;
+
+  categories.forEach((cat) => {
+    const color = USAGE_COLORS[cat.key] || "#9aa0a6";
+    const percent = totalBytes > 0 ? (cat.bytes / totalBytes) * 100 : 0;
+
+    const seg = document.createElement("div");
+    seg.className = "usage-bar-seg";
+    seg.style.width = `${percent}%`;
+    seg.style.background = color;
+    seg.title = `${cat.label}: ${formatBytes(cat.bytes)}`;
+    bar.appendChild(seg);
+
+    const row = document.createElement("li");
+    const swatch = document.createElement("span");
+    swatch.className = "usage-swatch";
+    swatch.style.background = color;
+    const label = document.createElement("span");
+    label.className = "usage-label";
+    label.textContent = cat.label;
+    const count = document.createElement("span");
+    count.className = "usage-count";
+    count.textContent = `${cat.items} item${cat.items === 1 ? "" : "s"}`;
+    const size = document.createElement("span");
+    size.className = "usage-size";
+    size.textContent = formatBytes(cat.bytes);
+    const pct = document.createElement("span");
+    pct.className = "usage-pct";
+    pct.textContent = totalBytes > 0 ? `${Math.round(percent)}%` : "0%";
+    row.append(swatch, label, count, size, pct);
+    legend.appendChild(row);
+  });
+}
+
 async function loadCurrentUsername() {
   try {
     const res = await fetch("/api/auth/status", { credentials: "include" });
@@ -525,6 +677,7 @@ async function loadCurrentUsername() {
       loadNotificationPrefs();
       loadPrivacySettings();
       loadThemePreference();
+      loadUsageStats();
     }
   } catch (err) {
     console.error("Failed to load current username for delete-account confirmation:", err);
@@ -585,6 +738,7 @@ async function loadPrivacySettings() {
   const followersSelect = document.getElementById("followersVisibility");
   const followingSelect = document.getElementById("followingVisibility");
   const activityToggle = document.getElementById("activityVisible");
+  const forumToggle = document.getElementById("forumVisible");
   if (!followersSelect || !followingSelect) return;
 
   try {
@@ -594,35 +748,40 @@ async function loadPrivacySettings() {
       followersSelect.value = json.followersVisibility;
       followingSelect.value = json.followingVisibility;
       if (activityToggle) activityToggle.checked = json.activityVisible !== false;
+      if (forumToggle) forumToggle.checked = json.forumVisible !== false;
     }
   } catch (err) {
     console.error("Failed to load privacy settings:", err);
   }
 
-  if (activityToggle) {
-    activityToggle.addEventListener("change", async () => {
-      const previousValue = !activityToggle.checked;
+  function bindPrivacyToggle(toggle, key) {
+    if (!toggle) return;
+    toggle.addEventListener("change", async () => {
+      const previousValue = !toggle.checked;
       try {
         const res = await fetch("/api/users/privacy-settings", {
           method: "POST",
           credentials: "include",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ activityVisible: activityToggle.checked })
+          body: JSON.stringify({ [key]: toggle.checked }),
         });
         const json = await res.json();
         if (json.ok) {
           showToast("Privacy setting saved");
         } else {
-          activityToggle.checked = previousValue;
+          toggle.checked = previousValue;
           showToast(json.error || "Failed to save setting", { error: true });
         }
       } catch (err) {
-        console.error("Failed to save activity visibility:", err);
-        activityToggle.checked = previousValue;
+        console.error("Failed to save privacy toggle:", err);
+        toggle.checked = previousValue;
         showToast("Failed to save setting", { error: true });
       }
     });
   }
+
+  bindPrivacyToggle(activityToggle, "activityVisible");
+  bindPrivacyToggle(forumToggle, "forumVisible");
 
   if (window.enhanceSelect) {
     window.enhanceSelect(followersSelect);

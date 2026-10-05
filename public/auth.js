@@ -1118,7 +1118,7 @@ import { enhanceSelect } from './custom-select.js';
 
     const items = [
       { action: 'profile', label: 'Profile', href: `/profile/${encodeURIComponent(username)}` },
-      { action: 'dashboard', label: 'Dashboard', href: '/dashboard.html' },
+      { action: 'dashboard', label: 'Dashboard', href: '/dashboard' },
       { action: 'changelog', label: 'Changelog', href: '/changelog' },
       { action: 'logout', label: 'Logout' }
     ];

@@ -17,6 +17,10 @@ const NOTIFICATION_CATEGORIES = {
   changelog_entry: "changelogUpdates",
   model_voted: "modelVoted",
   model_remixed: "modelRemixed",
+  forum_reply: "forumReplies",
+  forum_mention: "forumMentions",
+  forum_accepted: "forumAccepted",
+  forum_vote: "forumVotes",
 };
 
 export const NOTIFICATION_PREF_KEYS = [
@@ -32,6 +36,10 @@ export const NOTIFICATION_PREF_KEYS = [
   "changelogUpdates",
   "modelVoted",
   "modelRemixed",
+  "forumReplies",
+  "forumMentions",
+  "forumAccepted",
+  "forumVotes",
 ];
 
 export async function getNotificationPrefs(userId) {

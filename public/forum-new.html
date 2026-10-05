@@ -1,0 +1,200 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <meta name="color-scheme" content="dark">
+  <style>html { background: #101010; }</style>
+  <script>
+    (function () {
+      try {
+        const saved = localStorage.getItem("cubyzhub-theme");
+        if (saved !== "default") {
+          document.documentElement.setAttribute("data-theme", "ashframe");
+        }
+      } catch (_) {
+        document.documentElement.setAttribute("data-theme", "ashframe");
+      }
+    })();
+  </script>
+
+  <title>New Discussion &middot; Cubyz Hub</title>
+  <meta name="description" content="Start a new discussion on the CubyzHub forum.">
+  <meta name="robots" content="noindex">
+  <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml">
+  <link rel="icon" href="/assets/favicon.ico" sizes="any">
+  <link rel="apple-touch-icon" href="/assets/apple-touch-icon.png">
+
+  <link rel="stylesheet" href="/dist/buttons.css?v=20260919-17" />
+  <link rel="stylesheet" href="/dist/style.css?v=20260919-18" />
+  <link rel="stylesheet" href="/dist/ashframe-theme.css?v=20260919-17" />
+  <link rel="stylesheet" href="/forum.css?v=20260919-46" />
+</head>
+
+<body>
+  <header class="site-header">
+    <h1 class="site-title bbh-sans-hegarty-regular" onclick="location.href='/'" style="cursor:pointer;">
+      Cubyz Hub
+    </h1>
+    <div class="header-actions nav-user" id="nav-user"></div>
+    <button type="button" class="theme-toggle-btn" id="themeToggleBtn" data-theme-trigger aria-label="Toggle theme" title="Toggle theme">
+      <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <circle cx="12" cy="12" r="9"></circle>
+        <path d="M12 3a9 9 0 0 1 0 18z" fill="currentColor" stroke="none"></path>
+      </svg>
+    </button>
+  </header>
+
+  <main class="forum-page">
+    <div class="compose-page">
+      <div class="compose-topbar">
+        <nav class="thread-breadcrumb" aria-label="Breadcrumb">
+          <span class="crumb-sep" aria-hidden="true">/</span>
+          <span class="crumb-current">New discussion</span>
+        </nav>
+        <div class="compose-topbar-actions">
+          <span class="compose-draft-status" id="ndDraftStatus"></span>
+          <a class="btn btn-ghost btn-sm" href="/forum">Cancel</a>
+          <button type="submit" form="newDiscussionForm" class="btn btn-primary btn-sm" id="ndSubmit">Post Discussion</button>
+        </div>
+      </div>
+
+      <div id="composeLogin" class="panel compose-login" hidden>
+        <h2>Log in to post</h2>
+        <p class="muted">You need an account to start a discussion. Reading and search stay open to everyone.</p>
+        <button type="button" class="btn btn-primary" data-open-auth>Log in / Register</button>
+      </div>
+
+      <form id="newDiscussionForm" class="forum-modal-box compose-card" data-view="write" hidden novalidate>
+        <p class="nd-draft" id="ndDraft" hidden>Draft restored. <button type="button" class="link-btn" id="ndDraftDiscard">Discard draft</button></p>
+
+        <div class="compose-cols">
+          <div class="compose-main">
+            <p class="nd-error" id="ndError" role="alert" hidden></p>
+
+            <div class="field">
+              <label for="ndTitle">Title</label>
+              <input id="ndTitle" type="text" maxlength="67" required placeholder="What would you like to discuss?">
+              <p class="field-hint nd-title-hint"><span id="ndTitleCount">0</span>/67 &middot; at least 5 characters</p>
+            </div>
+
+            <div class="field compose-body-field">
+              <div class="nd-body-head">
+                <label for="ndBody">Body <span class="muted">(Markdown supported, min 120 characters)</span></label>
+                <div class="compose-view-toggle" role="group" aria-label="Editor view">
+                  <button type="button" data-view="write" class="active">Write</button>
+                  <button type="button" data-view="split">Split</button>
+                  <button type="button" data-view="preview">Preview</button>
+                </div>
+              </div>
+              <div class="md-toolbar" id="ndToolbar" role="toolbar" aria-label="Formatting"></div>
+              <div class="compose-editor-split">
+                <textarea id="ndBody" rows="16" placeholder="Describe your issue or idea. Markdown is supported."></textarea>
+                <div class="md-preview compose-live-preview" id="ndPreview"></div>
+              </div>
+            </div>
+          </div>
+
+          <aside class="compose-side">
+            <div class="panel">
+              <h3 class="panel-subtitle">Post type</h3>
+              <div class="nd-types" id="ndTypes" role="radiogroup" aria-label="Post type">
+                <button type="button" class="nd-type" data-type="question" role="radio" aria-checked="false">Question</button>
+                <button type="button" class="nd-type" data-type="bug" role="radio" aria-checked="false">Bug</button>
+                <button type="button" class="nd-type" data-type="idea" role="radio" aria-checked="false">Idea</button>
+                <button type="button" class="nd-type" data-type="showcase" role="radio" aria-checked="false">Showcase</button>
+                <button type="button" class="nd-type" data-type="guide" role="radio" aria-checked="false">Guide</button>
+                <button type="button" class="nd-type" data-type="discussion" role="radio" aria-checked="false">Discussion</button>
+              </div>
+              <input type="hidden" id="ndType" value="question">
+              <p class="field-hint" id="ndTypeHint"></p>
+            </div>
+
+            <div class="panel">
+              <h3 class="panel-subtitle">Category &amp; tags</h3>
+              <div class="field">
+                <label for="ndCategory">Category</label>
+                <select id="ndCategory" class="privacy-select">
+                  <option value="Game">Game</option>
+                  <option value="Addons &amp; Mods">Addons &amp; Mods</option>
+                  <option value="Creation">Creation</option>
+                  <option value="Development">Development</option>
+                  <option value="General" selected>General</option>
+                </select>
+              </div>
+              <div class="field">
+                <label for="ndTags">Tags <span class="muted">(comma separated)</span></label>
+                <input id="ndTags" type="text" list="tagSuggestions" placeholder="bug, performance">
+                <datalist id="tagSuggestions"></datalist>
+              </div>
+            </div>
+
+            <div class="panel">
+              <h3 class="panel-subtitle">Similar discussions</h3>
+              <div class="nd-similar" id="ndSimilar"></div>
+              <p class="muted compose-similar-empty" id="ndSimilarEmpty">Type a title to check for duplicates.</p>
+            </div>
+
+            <div class="panel">
+              <h3 class="panel-subtitle">Tips</h3>
+              <ul class="compose-tips">
+                <li>Search first. If a discussion already exists, link that instead.</li>
+                <li>Use a clear title so it is easy to find later.</li>
+                <li>Choosing a post type gives you a checklist for it.</li>
+                <li>You can use Markdown for links, lists and code.</li>
+                <li>Put two or more images on their own lines to make a gallery - click any image to view them full size.</li>
+                <li>Type <strong>@</strong> to mention someone (they get notified) or <strong>[[</strong> to link an addon.</li>
+                <li>Resize an image with <code>![caption|2](url)</code> (1 small &ndash; 4 full width). A Streamable, YouTube or Vimeo link on its own line embeds as a player &mdash; add <code>|1</code>&ndash;<code>|4</code> to the link to resize it.</li>
+              </ul>
+            </div>
+          </aside>
+        </div>
+      </form>
+    </div>
+  </main>
+
+  <footer class="site-footer">
+    <div class="site-footer-columns">
+      <div class="site-footer-col">
+        <h3>Browse</h3>
+        <a href="/addons">Addons &amp; Mods</a>
+        <a href="/models">Models</a>
+        <a href="/servers">Servers</a>
+        <a href="/changelog">Changelog</a>
+      </div>
+      <div class="site-footer-col">
+        <h3>Create</h3>
+        <a href="/upload.html">Upload</a>
+        <a href="/creator/">Addon Creator</a>
+        <a href="/dashboard">Dashboard</a>
+      </div>
+      <div class="site-footer-col">
+        <h3>Community</h3>
+        <a href="/forum">Forum</a>
+        <a href="/feedback">Feedback</a>
+        <a href="/metrics">Metrics</a>
+        <a href="https://discord.gg/QsjZnQzEsc" target="_blank" rel="noopener noreferrer">Discord Server</a>
+        <a href="https://github.com/ashframe-org/cubyz-hub" target="_blank" rel="noopener noreferrer">Open Source</a>
+      </div>
+    </div>
+    <div class="site-footer-divider"></div>
+    <div class="site-footer-row">
+      <p class="site-footer-blurb">CubyzHub is a community-run platform for Cubyz addons and mods, not an official Cubyz service.</p>
+      <span class="site-footer-credit">Cubyz Hub &middot; by iNiKKo &copy; 2025-2026</span>
+    </div>
+  </footer>
+
+  <script src="/vendor/simplewebauthn-browser.umd.min.js"></script>
+  <script src="/vendor/marked.umd.js?v=20260919-17"></script>
+  <script src="/vendor/purify.min.js?v=20260919-17"></script>
+  <script src="/theme-toggle.js?v=20260919-17"></script>
+  <script src="/toast.js?v=20260919-17"></script>
+  <script type="module" src="/dist/auth.js?v=20260919-22"></script>
+  <script src="/forum-gallery.js?v=20260919-03"></script>
+  <script type="module" src="/forum-markdown.js?v=20260919-03"></script>
+  <script src="/forum-editor.js?v=20260919-06"></script>
+  <script src="/forum-new.js?v=20260919-07"></script>
+</body>
+
+</html>

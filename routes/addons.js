@@ -4,11 +4,13 @@ import fs from "fs";
 import { db, withTransaction } from "../db/index.js";
 import { AI_USAGE_VALUES, RELEASE_CHANNEL_VALUES } from "../utils/constants.js";
 import { parseCreatorsJson, slugify, addonLink, downloadFilename } from "../utils/common.js";
+import { RP_ORIGIN } from "../config.js";
 import { getCubyzVersions, getGithubReleases, parseGithubRepoUrl } from "../services/github.js";
 import { createNotification, notifyDownloadMilestones } from "../services/notifications.js";
 import { deleteAddonCascade } from "../services/addons.js";
 import { upload, verifyFiles, resolveLocalFile } from "../services/uploads.js";
 import { shouldCountDownload } from "../utils/throttles.js";
+import { recordMetric } from "../services/metrics.js";
 
 const router = express.Router();
 
@@ -60,6 +62,18 @@ router.post(
 
       if (version && String(version).length > 20)
         return res.json({ ok: false, error: "Version must be 20 characters or fewer." });
+
+      if (String(name).trim().length > 80)
+        return res.status(400).json({ ok: false, error: "Name must be 80 characters or fewer." });
+
+      if (String(identifier).trim().length > 80)
+        return res.status(400).json({ ok: false, error: "Identifier must be 80 characters or fewer." });
+
+      if (longDescription && String(longDescription).length > 20000)
+        return res.status(400).json({ ok: false, error: "Long description must be 20000 characters or fewer." });
+
+      if (compatibility && String(compatibility).length > 40)
+        return res.status(400).json({ ok: false, error: "Compatibility must be 40 characters or fewer." });
 
       const addonType = type === "mod" ? "mod" : "addon";
       let githubModeValue = "manual";
@@ -115,49 +129,75 @@ router.post(
       } catch {
         return res.status(400).json({ ok: false, error: "Invalid tags format." });
       }
+      if (tagArray.length > 10 || tagArray.some((t) => String(t).length > 30)) {
+        return res.status(400).json({ ok: false, error: "Use at most 10 tags of 30 characters each." });
+      }
       const timestampIso = new Date().toISOString();
       const licenseValue = license ? String(license).trim().slice(0, 60) || null : null;
       const aiUsageValue = AI_USAGE_VALUES.includes(aiUsage) ? aiUsage : "none";
       const releaseChannelValue = RELEASE_CHANNEL_VALUES.includes(releaseChannel) ? releaseChannel : "release";
 
-      await db.run(
-        `INSERT OR REPLACE INTO addons
-        (identifier, name, author, version, description, longDescription, tags, compatibility, iconUrl, bannerUrl, iconThumbUrl, bannerThumbUrl, creators, screenshots, fileUrl, created_at, updated_at, type, github_mode, githubUrl, license, ai_usage)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-                   [
-                     identifier,
-                   name,
-                   finalAuthor,
-                   version,
-                   description,
-                   longDescription,
-                   JSON.stringify(tagArray),
-                   compatibility,
-                   iconUrl,
-                   bannerUrl,
-                   iconThumbUrl,
-                   bannerThumbUrl,
-                   JSON.stringify([]),
-                   JSON.stringify(screenshots),
-                   fileUrl,
-                   timestampIso,
-                   timestampIso,
-                   addonType,
-                   githubModeValue,
-                   githubUrlValue,
-                   licenseValue,
-                   aiUsageValue
-                   ]
-      );
-
-      const newAddon = await db.get("SELECT * FROM addons WHERE identifier = ?", identifier);
-
-      if (fileUrl) {
+      const newAddon = await withTransaction(async () => {
         await db.run(
-          "INSERT INTO versions (addon_id, version, fileUrl, compatibility, release_channel) VALUES (?, ?, ?, ?, ?)",
-                     [newAddon.id, version || "", fileUrl, compatibility || null, releaseChannelValue]
+          `INSERT INTO addons
+          (identifier, name, author, version, description, longDescription, tags, compatibility, iconUrl, bannerUrl, iconThumbUrl, bannerThumbUrl, creators, screenshots, fileUrl, created_at, updated_at, type, github_mode, githubUrl, license, ai_usage)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          ON CONFLICT(identifier) DO UPDATE SET
+            name = excluded.name,
+            version = excluded.version,
+            description = excluded.description,
+            longDescription = excluded.longDescription,
+            tags = excluded.tags,
+            compatibility = excluded.compatibility,
+            iconUrl = excluded.iconUrl,
+            bannerUrl = excluded.bannerUrl,
+            iconThumbUrl = excluded.iconThumbUrl,
+            bannerThumbUrl = excluded.bannerThumbUrl,
+            screenshots = excluded.screenshots,
+            fileUrl = excluded.fileUrl,
+            updated_at = excluded.updated_at,
+            type = excluded.type,
+            github_mode = excluded.github_mode,
+            githubUrl = excluded.githubUrl,
+            license = excluded.license,
+            ai_usage = excluded.ai_usage`,
+          [
+            identifier,
+            name,
+            finalAuthor,
+            version,
+            description,
+            longDescription,
+            JSON.stringify(tagArray),
+            compatibility,
+            iconUrl,
+            bannerUrl,
+            iconThumbUrl,
+            bannerThumbUrl,
+            JSON.stringify([]),
+            JSON.stringify(screenshots),
+            fileUrl,
+            timestampIso,
+            timestampIso,
+            addonType,
+            githubModeValue,
+            githubUrlValue,
+            licenseValue,
+            aiUsageValue
+          ]
         );
-      }
+
+        const targetAddon = await db.get("SELECT * FROM addons WHERE identifier = ?", [identifier]);
+
+        if (fileUrl) {
+          await db.run(
+            "INSERT INTO versions (addon_id, version, fileUrl, compatibility, release_channel) VALUES (?, ?, ?, ?, ?)",
+            [targetAddon.id, version || "", fileUrl, compatibility || null, releaseChannelValue]
+          );
+        }
+
+        return targetAddon;
+      });
 
       if (!existingAddon) {
         try {
@@ -196,6 +236,7 @@ router.post(
         }
       }
 
+      recordMetric("uploads");
       res.json({ ok: true, addon: newAddon });
     } catch (err) {
       console.error("Upload failed:", err);
@@ -316,6 +357,7 @@ router.get(["/addon/:slugOrId", "/mod/:slugOrId"], async (req, res) => {
     const esc = (s) => String(s || "")
     .replace(/&/g, "&amp;")
     .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;")
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;");
 
@@ -330,10 +372,10 @@ router.get(["/addon/:slugOrId", "/mod/:slugOrId"], async (req, res) => {
     const description = addon.description || "View this addon on CubyzHub";
     const isAbsolute = addon.iconUrl && addon.iconUrl.startsWith("http");
     const image = addon.iconUrl
-    ? (isAbsolute ? addon.iconUrl : `${req.protocol}://${req.get("host")}${addon.iconUrl}`)
-    : `${req.protocol}://${req.get("host")}/assets/default_icon.png`;
+    ? (isAbsolute ? addon.iconUrl : `${RP_ORIGIN}${addon.iconUrl}`)
+    : `${RP_ORIGIN}/assets/default_icon.png`;
 
-    const url = `${req.protocol}://${req.get("host")}${correctUrl}`;
+    const url = `${RP_ORIGIN}${correctUrl}`;
 
     res.send(`
     <!doctype html>
@@ -345,9 +387,9 @@ router.get(["/addon/:slugOrId", "/mod/:slugOrId"], async (req, res) => {
     <meta property="og:type" content="website">
     <meta property="og:title" content="${esc(title)}">
     <meta property="og:description" content="${esc(description)}">
-    <meta property="og:image" content="${image}">
-    <meta property="og:url" content="${url}">
-    <link rel="canonical" href="${url}">
+    <meta property="og:image" content="${esc(image)}">
+    <meta property="og:url" content="${esc(url)}">
+    <link rel="canonical" href="${esc(url)}">
     <meta name="twitter:card" content="summary_large_image">
     <title>${esc(title)}</title>
     </head>
@@ -358,6 +400,71 @@ router.get(["/addon/:slugOrId", "/mod/:slugOrId"], async (req, res) => {
     `);
   } catch (err) {
     console.error("OG PREVIEW ERROR:", err);
+    res.status(500).send("Error generating preview");
+  }
+});
+
+// Shareable per-version link: Discord/social embeds show the addon name,
+// version, target game version and the version changelog, then the page
+// redirects into the addon with that version's changelog opened.
+router.get("/version/:versionId", async (req, res) => {
+  try {
+    const vid = parseInt(req.params.versionId, 10);
+    if (!Number.isInteger(vid)) return res.status(404).send("Version not found");
+    const row = await db.get(
+      `SELECT v.id, v.version, v.compatibility, v.changelog, v.og_image,
+              a.id AS addon_id, a.name, a.type, a.iconUrl, a.bannerUrl
+       FROM versions v JOIN addons a ON a.id = v.addon_id
+       WHERE v.id = ?`,
+      [vid]
+    );
+    if (!row) return res.status(404).send("Version not found");
+
+    const esc = (s) => String(s || "")
+      .replace(/&/g, "&amp;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#39;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;");
+
+    const url = `${RP_ORIGIN}/version/${row.id}`;
+    const title = `${row.name}${row.version ? " " + row.version : ""}`;
+    const gameLine = row.compatibility ? `Game version ${row.compatibility}` : "";
+    const description = [gameLine, "New update on CubyzHub"].filter(Boolean).join(" · ")
+      || `New version of ${row.name} on CubyzHub`;
+
+    const rawImage = row.og_image || row.bannerUrl || row.iconUrl;
+    const image = rawImage
+      ? (/^https?:\/\//i.test(rawImage) ? rawImage : `${RP_ORIGIN}${rawImage}`)
+      : `${RP_ORIGIN}/assets/default_icon.png`;
+
+    res.send(`
+    <!doctype html>
+    <html>
+    <head>
+    <meta charset="utf-8">
+    <meta name="color-scheme" content="dark">
+    <style>html, body { background: #1A1F1C; margin: 0; }</style>
+    <meta property="og:type" content="article">
+    <meta property="og:site_name" content="CubyzHub">
+    <meta property="og:title" content="${esc(title)}">
+    <meta property="og:description" content="${esc(description)}">
+    <meta property="og:image" content="${esc(image)}">
+    <meta property="og:url" content="${esc(url)}">
+    <link rel="canonical" href="${esc(url)}">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="${esc(title)}">
+    <meta name="twitter:description" content="${esc(description)}">
+    <meta name="twitter:image" content="${esc(image)}">
+    <title>${esc(title)}</title>
+    </head>
+    <body>
+    <script>window.location.replace("/addon.html?id=${row.addon_id}&version=${row.id}");</script>
+    </body>
+    </html>
+    `);
+  } catch (err) {
+    console.error("VERSION OG PREVIEW ERROR:", err);
     res.status(500).send("Error generating preview");
   }
 });
@@ -495,7 +602,7 @@ router.get("/api/search", async (req, res) => {
     const [addons, users] = await Promise.all([
       includeAddons
       ? db.all(
-        `SELECT id, name, author, description, iconUrl, bannerUrl, iconThumbUrl, bannerThumbUrl, downloads, stars, created_at, updated_at
+        `SELECT id, name, type, author, description, iconUrl, bannerUrl, iconThumbUrl, bannerThumbUrl, downloads, stars, created_at, updated_at
         FROM addons
         WHERE name LIKE ? ESCAPE '\\'
         OR description LIKE ? ESCAPE '\\'
@@ -612,6 +719,18 @@ router.post(
       if (version !== undefined && String(version).length > 20)
         return res.json({ ok: false, error: "Version must be 20 characters or fewer." });
 
+      if (name !== undefined && String(name).trim().length > 80)
+        return res.status(400).json({ ok: false, error: "Name must be 80 characters or fewer." });
+
+      if (longDescription !== undefined && String(longDescription).length > 20000)
+        return res.status(400).json({ ok: false, error: "Long description must be 20000 characters or fewer." });
+
+      if (compatibility !== undefined && String(compatibility).length > 40)
+        return res.status(400).json({ ok: false, error: "Compatibility must be 40 characters or fewer." });
+
+      if (changelog !== undefined && String(changelog).length > 5000)
+        return res.status(400).json({ ok: false, error: "Changelog must be 5000 characters or fewer." });
+
       let updates = {};
       if (name !== undefined) updates.name = name;
       if (version !== undefined) updates.version = version;
@@ -664,7 +783,11 @@ router.post(
       if (tags !== undefined) {
         try {
           const parsed = typeof tags === "string" ? JSON.parse(tags) : tags;
-          updates.tags = JSON.stringify(parsed || []);
+          const parsedTags = Array.isArray(parsed) ? parsed : [];
+          if (parsedTags.length > 10 || parsedTags.some((t) => String(t).length > 30)) {
+            return res.status(400).json({ ok: false, error: "Use at most 10 tags of 30 characters each." });
+          }
+          updates.tags = JSON.stringify(parsedTags);
         } catch {
           updates.tags = JSON.stringify([]);
         }
@@ -866,6 +989,7 @@ router.post("/api/addons/:id/like", async (req, res) => {
     await db.run("UPDATE addons SET stars = ? WHERE id = ?", [totalStars, addonId]);
 
     if (liked) {
+      recordMetric("likes");
       try {
         const author = await db.get("SELECT id FROM users WHERE username = ?", addon.author);
         if (author && author.id !== userId) {
@@ -922,6 +1046,7 @@ router.get("/api/addons/:id/download", async (req, res) => {
       } catch (err) {
         console.error("Failed to create milestone notification:", err);
       }
+      recordMetric("downloads");
     }
 
     const filePath = resolveLocalFile(addon.fileUrl);

@@ -2,6 +2,7 @@ import express from "express";
 import { db } from "../db/index.js";
 import { createNotification } from "../services/notifications.js";
 import { parseCreatorsJson, addonLink } from "../utils/common.js";
+import { recordMetric } from "../services/metrics.js";
 
 const router = express.Router();
 
@@ -88,10 +89,13 @@ router.post("/api/creator-invites/:id/respond", express.json(), async (req, res)
       return res.status(400).json({ ok: false, error: "This invite has already been responded to." });
     }
 
-    await db.run(
-      "UPDATE creator_invites SET status = ?, responded_at = CURRENT_TIMESTAMP WHERE id = ?",
+    const updated = await db.run(
+      "UPDATE creator_invites SET status = ?, responded_at = CURRENT_TIMESTAMP WHERE id = ? AND status = 'pending'",
       [accept ? "accepted" : "declined", inviteId]
     );
+    if (updated.changes === 0) {
+      return res.status(400).json({ ok: false, error: "This invite has already been responded to." });
+    }
 
     const addon = await db.get("SELECT id, name, creators, type FROM addons WHERE id = ?", [invite.addon_id]);
     if (accept && addon) {
@@ -201,10 +205,16 @@ router.post("/api/creator-projects", express.json({ limit: "5mb" }), async (req,
       return res.status(400).json({ ok: false, error: "Missing project data." });
     }
 
+    const projectCount = await db.get("SELECT COUNT(*) AS n FROM creator_projects WHERE user_id = ?", [req.session.user.id]);
+    if (projectCount.n >= 200) {
+      return res.status(400).json({ ok: false, error: "Project limit reached (200)." });
+    }
+
     const result = await db.run(
       `INSERT INTO creator_projects (user_id, name, game_version, data) VALUES (?, ?, ?, ?)`,
       [req.session.user.id, name, gameVersion, JSON.stringify(req.body.data)]
     );
+    recordMetric("creator_saves");
     res.json({ ok: true, id: result.lastID });
   } catch (err) {
     console.error("CREATE CREATOR PROJECT ERROR:", err);
@@ -232,6 +242,7 @@ router.put("/api/creator-projects/:id", express.json({ limit: "5mb" }), async (r
       `UPDATE creator_projects SET name = ?, game_version = ?, data = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
       [name, gameVersion, JSON.stringify(req.body.data), req.params.id]
     );
+    recordMetric("creator_saves");
     res.json({ ok: true });
   } catch (err) {
     console.error("UPDATE CREATOR PROJECT ERROR:", err);

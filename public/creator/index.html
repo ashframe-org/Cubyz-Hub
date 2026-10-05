@@ -25,9 +25,9 @@
   <link rel="apple-touch-icon" href="/assets/apple-touch-icon.png">
 
   <link rel="stylesheet" href="/dist/buttons.css?v=20260919-17" />
-  <link rel="stylesheet" href="/dist/style.css?v=20260919-17" />
+  <link rel="stylesheet" href="/dist/style.css?v=20260919-18" />
   <link rel="stylesheet" href="/dist/ashframe-theme.css?v=20260919-17" />
-  <link rel="stylesheet" href="style.css?v=20260919-17" />
+  <link rel="stylesheet" href="style.css?v=20260919-24" />
 </head>
 
 <body>
@@ -93,11 +93,14 @@
         </div>
 
         <div id="startModal" class="custom-modal-overlay" style="display: none;">
-            <div class="custom-modal-box" style="width: 480px;">
+            <div class="custom-modal-box start-modal-box">
                 <h3 class="custom-modal-title">Welcome to the Addon Creator</h3>
-                <p class="custom-modal-message">How would you like to start?</p>
+                <p class="custom-modal-message">Build Cubyz addons right in your browser. How would you like to start?</p>
 
                 <div class="start-modal-choice">
+                    <div class="start-modal-choice-icon" aria-hidden="true">
+                        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"></path></svg>
+                    </div>
                     <div class="start-modal-choice-info">
                         <div class="start-modal-choice-title">New Addon</div>
                         <div class="start-modal-choice-desc">Start with an empty workspace.</div>
@@ -109,6 +112,9 @@
                 </div>
 
                 <div class="start-modal-choice">
+                    <div class="start-modal-choice-icon" aria-hidden="true">
+                        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6a2 2 0 0 1 2-2h4l2 2h6a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2Z"></path></svg>
+                    </div>
                     <div class="start-modal-choice-info">
                         <div class="start-modal-choice-title">Load Saved</div>
                         <div class="start-modal-choice-desc">Pick up a project from your account.</div>
@@ -118,7 +124,10 @@
                     </div>
                 </div>
 
-                <div class="start-modal-choice" style="border-bottom: none;">
+                <div class="start-modal-choice">
+                    <div class="start-modal-choice-icon" aria-hidden="true">
+                        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V4"></path><path d="m7 9 5-5 5 5"></path><path d="M4 16v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"></path></svg>
+                    </div>
                     <div class="start-modal-choice-info">
                         <div class="start-modal-choice-title">Import Addon</div>
                         <div class="start-modal-choice-desc">Upload an existing addon's .ZIP.</div>
@@ -150,12 +159,34 @@
         </div>
 
         <div id="postImportChoiceModal" class="custom-modal-overlay" style="display: none;">
-            <div class="custom-modal-box" style="width: 480px;">
+            <div class="custom-modal-box start-modal-box">
                 <h3 class="custom-modal-title">Import Complete</h3>
                 <p class="custom-modal-message" id="postImportChoiceMessage">Imported. What would you like to do?</p>
-                <div class="custom-modal-actions">
-                    <button type="button" class="btn-secondary modal-btn" id="postImportChoiceUpdateBtn">Update to a different version&hellip;</button>
-                    <button type="button" class="btn-primary modal-btn" id="postImportChoiceEditBtn">Edit at this version</button>
+
+                <div class="start-modal-choice">
+                    <div class="start-modal-choice-icon" aria-hidden="true">
+                        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5"></path><path d="m5 12 7-7 7 7"></path></svg>
+                    </div>
+                    <div class="start-modal-choice-info">
+                        <div class="start-modal-choice-title">Update to another version</div>
+                        <div class="start-modal-choice-desc">Migrate the imported addon to a different game version.</div>
+                    </div>
+                    <div class="start-modal-choice-action">
+                        <button type="button" class="btn-secondary modal-btn" id="postImportChoiceUpdateBtn">Choose&hellip;</button>
+                    </div>
+                </div>
+
+                <div class="start-modal-choice">
+                    <div class="start-modal-choice-icon" aria-hidden="true">
+                        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"></path><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"></path></svg>
+                    </div>
+                    <div class="start-modal-choice-info">
+                        <div class="start-modal-choice-title">Edit at this version</div>
+                        <div class="start-modal-choice-desc">Open the imported addon in the editor as-is.</div>
+                    </div>
+                    <div class="start-modal-choice-action">
+                        <button type="button" class="btn-primary modal-btn" id="postImportChoiceEditBtn">Open</button>
+                    </div>
                 </div>
             </div>
         </div>
@@ -302,21 +333,29 @@
 
   <footer class="site-footer">
     <div class="site-footer-columns">
-      <div class="site-footer-col">
-        <h3>CubyzHub</h3>
-        <a href="/addons">Explore</a>
-        <a href="/upload.html">Upload</a>
+            <div class="site-footer-col">
+        <h3>Browse</h3>
+        <a href="/addons">Addons &amp; Mods</a>
         <a href="/models">Models</a>
         <a href="/servers">Servers</a>
-        <a href="/dashboard.html">Dashboard</a>
+        <a href="/changelog">Changelog</a>
+      </div>
+      <div class="site-footer-col">
+        <h3>Create</h3>
+        <a href="/upload.html">Upload</a>
+        <a href="/creator/">Addon Creator</a>
+        <a href="/dashboard">Dashboard</a>
       </div>
       <div class="site-footer-col">
         <h3>Community</h3>
+        <a href="/forum">Forum</a>
+        <a href="/feedback">Feedback</a>
+        <a href="/metrics">Metrics</a>
         <a href="https://discord.gg/QsjZnQzEsc" target="_blank" rel="noopener noreferrer">
           <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor" aria-hidden="true"><path d="M20.32 4.37a19.8 19.8 0 0 0-4.9-1.52.07.07 0 0 0-.08.04c-.21.38-.45.87-.61 1.26a18.3 18.3 0 0 0-5.48 0 12.6 12.6 0 0 0-.63-1.26.08.08 0 0 0-.08-.04c-1.7.3-3.36.8-4.9 1.52a.07.07 0 0 0-.03.03C.53 8.7-.32 12.9.1 17.06a.08.08 0 0 0 .03.06 19.9 19.9 0 0 0 6 3.03.08.08 0 0 0 .08-.03c.46-.63.87-1.3 1.23-2a.08.08 0 0 0-.04-.11 13.1 13.1 0 0 1-1.87-.9.08.08 0 0 1-.01-.13c.13-.09.25-.19.37-.28a.07.07 0 0 1 .08-.01c3.93 1.79 8.18 1.79 12.06 0a.07.07 0 0 1 .08 0c.12.1.24.2.37.29a.08.08 0 0 1-.01.13c-.6.35-1.22.65-1.87.9a.08.08 0 0 0-.04.11c.36.7.78 1.37 1.23 2a.08.08 0 0 0 .08.03 19.83 19.83 0 0 0 6.01-3.03.08.08 0 0 0 .03-.06c.5-4.83-.83-9-3.53-12.66a.06.06 0 0 0-.03-.03ZM8.02 14.6c-1.18 0-2.15-1.08-2.15-2.42 0-1.33.95-2.42 2.15-2.42 1.21 0 2.17 1.1 2.15 2.42 0 1.34-.95 2.42-2.15 2.42Zm7.97 0c-1.18 0-2.15-1.08-2.15-2.42 0-1.33.95-2.42 2.15-2.42 1.21 0 2.17 1.1 2.15 2.42 0 1.34-.94 2.42-2.15 2.42Z"></path></svg>
           Discord Server
         </a>
-        <a href="https://github.com/ashframe-org" target="_blank" rel="noopener noreferrer">
+        <a href="https://github.com/ashframe-org/cubyz-hub" target="_blank" rel="noopener noreferrer">
           <svg viewBox="0 0 16 16" width="14" height="14" fill="currentColor" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8Z"></path></svg>
           Open Source
         </a>
@@ -385,15 +424,19 @@
   <script src="/theme-toggle.js?v=20260919-17"></script>
 
   <script src="vendor/jszip-3.10.1.min.js"></script>
-  <script src="app-core.js?v=20260919-17" defer></script>
-  <script src="app-studio.js?v=20260919-17" defer></script>
-  <script src="app-save.js?v=20260919-17" defer></script>
-  <script src="app-io.js?v=20260919-17" defer></script>
-  <script src="app-cloudsave.js?v=20260919-17" defer></script>
-  <script src="app-autosave.js?v=20260919-17" defer></script>
+  <script src="app-core.js?v=20260919-22" defer></script>
+  <script src="app-studio.js?v=20261004-1" defer></script>
+  <script src="app-save.js?v=20260919-21" defer></script>
+  <script src="app-io.js?v=20261004-1" defer></script>
+  <script src="app-worldgen.js?v=20260919-21" defer></script>
+  <script src="app-sbb.js?v=20260919-20" defer></script>
+  <script src="app-sdf.js?v=20260919-20" defer></script>
+  <script src="app-preview.js?v=20260919-36" defer></script>
+  <script src="app-cloudsave.js?v=20260919-18" defer></script>
+  <script src="app-autosave.js?v=20260919-18" defer></script>
   <script src="app-stresstest.js?v=20260919-17" defer></script>
   <script src="app-migrate.js?v=20260919-17" defer></script>
-  <script src="app-versionflow.js?v=20260919-17" defer></script>
+  <script src="app-versionflow.js?v=20260919-20" defer></script>
   <script src="app-lint.js?v=20260919-17" defer></script>
   <script type="module">
     import { enhanceSelect } from "../custom-select.js?v=20260919-17";
@@ -424,7 +467,7 @@
     enhanceWhenReady("versionDetectSelect");
   </script>
 
-  <script type="module" src="/dist/auth.js?v=20260919-17"></script>
+  <script type="module" src="/dist/auth.js?v=20260919-22"></script>
 
   <script>
     window.addEventListener("beforeunload", (e) => {

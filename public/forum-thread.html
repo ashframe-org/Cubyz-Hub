@@ -1,0 +1,210 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <meta name="color-scheme" content="dark">
+  <style>html { background: #101010; }</style>
+  <script>
+    (function () {
+      try {
+        const saved = localStorage.getItem("cubyzhub-theme");
+        if (saved !== "default") {
+          document.documentElement.setAttribute("data-theme", "ashframe");
+        }
+      } catch (_) {
+        document.documentElement.setAttribute("data-theme", "ashframe");
+      }
+    })();
+  </script>
+
+  <title>Discussion &middot; Cubyz Hub</title>
+  <meta name="description" content="A discussion on the CubyzHub forum.">
+  <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml">
+  <link rel="icon" href="/assets/favicon.ico" sizes="any">
+  <link rel="apple-touch-icon" href="/assets/apple-touch-icon.png">
+  <link rel="alternate" type="application/atom+xml" title="CubyzHub Forum" href="/forum/feed.xml">
+
+  <link rel="stylesheet" href="/dist/buttons.css?v=20260919-17" />
+  <link rel="stylesheet" href="/dist/style.css?v=20260919-18" />
+  <link rel="stylesheet" href="/dist/ashframe-theme.css?v=20260919-17" />
+  <link rel="stylesheet" href="/forum.css?v=20260919-46" />
+</head>
+
+<body>
+  <header class="site-header">
+    <h1 class="site-title bbh-sans-hegarty-regular" onclick="location.href='/'" style="cursor:pointer;">
+      Cubyz Hub
+    </h1>
+    <div class="header-actions nav-user" id="nav-user"></div>
+    <button type="button" class="theme-toggle-btn" id="themeToggleBtn" data-theme-trigger aria-label="Toggle theme" title="Toggle theme">
+      <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <circle cx="12" cy="12" r="9"></circle>
+        <path d="M12 3a9 9 0 0 1 0 18z" fill="currentColor" stroke="none"></path>
+      </svg>
+    </button>
+  </header>
+
+  <main class="forum-page">
+    <div class="thread-wrap">
+      <nav class="thread-breadcrumb" aria-label="Breadcrumb">
+        <span class="crumb-sep" aria-hidden="true">/</span>
+        <a href="/forum" id="crumbCategory">Discussions</a>
+        <span class="crumb-sep" aria-hidden="true">/</span>
+        <span class="crumb-current" id="crumbTitle">Discussion</span>
+      </nav>
+
+      <div class="thread-shell">
+        <div class="thread-page">
+        <article class="thread-view" id="threadView" hidden>
+        <div class="thread-op">
+        <div class="thread-head">
+          <div class="disc-tags" id="threadCategoryWrap"></div>
+          <h1 id="threadTitle"></h1>
+          <div class="thread-meta" id="threadMeta"></div>
+          <div class="disc-tags" id="threadTags"></div>
+        </div>
+
+        <div class="thread-post" id="threadBody"></div>
+
+        <div class="thread-actions">
+          <button type="button" class="thread-vote" id="threadVoteBtn">
+            <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 19V5"></path><path d="m5 12 7-7 7 7"></path></svg>
+            <span id="threadVotes">0</span>
+          </button>
+          <span class="stat" id="threadRepliesStat"></span>
+          <span class="badge badge-solved" id="threadSolved" hidden>Solved</span>
+          <div class="thread-actions-util">
+            <div class="thread-owner-actions" id="threadOwnerActions" hidden>
+              <button type="button" class="icon-btn" id="threadEditBtn" title="Edit" aria-label="Edit">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h9"></path><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4Z"></path></svg>
+              </button>
+              <button type="button" class="icon-btn" id="threadDeleteBtn" title="Delete" aria-label="Delete">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18"></path><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"></path><path d="M10 11v6"></path><path d="M14 11v6"></path></svg>
+              </button>
+            </div>
+            <div class="thread-owner-actions" id="threadModActions" hidden>
+              <button type="button" class="icon-btn" id="threadPinBtn" title="Pin" aria-label="Pin">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 17v5"></path><path d="M9 10.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 14 10.76V7a1 1 0 0 1 1-1 2 2 0 0 0 0-4H9a2 2 0 0 0 0 4 1 1 0 0 1 1 1Z"></path></svg>
+              </button>
+              <button type="button" class="icon-btn" id="threadLockBtn" title="Lock" aria-label="Lock">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="11" width="18" height="11" rx="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
+              </button>
+              <button type="button" class="icon-btn" id="threadHideBtn" title="Hide" aria-label="Hide">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9.88 9.88a3 3 0 1 0 4.24 4.24"></path><path d="M10.73 5.08A10.43 10.43 0 0 1 12 5c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"></path><path d="M6.61 6.61A13.5 13.5 0 0 0 1 13s4 8 11 8a10.4 10.4 0 0 0 5.39-1.61"></path><line x1="2" y1="2" x2="22" y2="22"></line></svg>
+              </button>
+            </div>
+            <span class="post-action-divider" aria-hidden="true"></span>
+            <button type="button" class="icon-btn" id="threadReportBtn" title="Report" aria-label="Report">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"></path><line x1="4" y1="22" x2="4" y2="15"></line></svg>
+            </button>
+          </div>
+        </div>
+        </div>
+
+        <div class="reply-toolbar">
+          <h2 class="panel-subtitle" id="threadRepliesTitle">Replies</h2>
+          <label class="reply-sort">
+            <span class="visually-hidden">Sort replies</span>
+            <select id="replySort">
+              <option value="oldest">Oldest first</option>
+              <option value="newest">Newest first</option>
+              <option value="votes">Most liked</option>
+            </select>
+          </label>
+        </div>
+        <ul class="reply-list" id="replyList"></ul>
+
+        <form class="reply-form" id="replyForm">
+          <label class="visually-hidden" for="replyInput">Reply</label>
+          <div class="md-toolbar" id="replyToolbar" role="toolbar" aria-label="Formatting">
+            <button type="button" data-md="bold" title="Bold (Ctrl+B)"><strong>B</strong></button>
+            <button type="button" data-md="italic" title="Italic (Ctrl+I)"><em>I</em></button>
+            <button type="button" data-md="strike" title="Strikethrough"><s>S</s></button>
+            <button type="button" data-md="heading" title="Heading">H</button>
+            <button type="button" data-md="link" title="Link (Ctrl+K)">Link</button>
+            <button type="button" data-md="ulist" title="Bulleted list">List</button>
+            <button type="button" data-md="olist" title="Numbered list">1.</button>
+            <button type="button" data-md="quote" title="Quote">&quot;</button>
+            <button type="button" data-md="code" title="Inline code">&lt;/&gt;</button>
+            <button type="button" data-md="codeblock" title="Code block">{ }</button>
+            <button type="button" data-md="image" title="Upload an image">Image</button>
+            <button type="button" data-md="hr" title="Divider">&mdash;</button>
+          </div>
+          <textarea id="replyInput" rows="3" placeholder="Write a reply... Markdown supported."></textarea>
+          <button type="submit" class="btn btn-primary">Reply</button>
+        </form>
+        <p class="reply-empty" id="replyLogin" hidden>
+          <button type="button" class="btn btn-primary btn-sm" data-open-auth>Log in to reply</button>
+        </p>
+        <p class="reply-empty" id="lockedNote" hidden>This discussion is locked.</p>
+      </article>
+
+        <p class="reply-empty" id="threadLoading">Loading discussion&hellip;</p>
+      </div>
+
+      <aside class="thread-side" id="threadSide" hidden aria-label="Thread details">
+        <div class="panel side-author" id="sideAuthor"></div>
+        <div class="panel side-stats">
+          <h3 class="panel-subtitle">Thread stats</h3>
+          <ul class="side-stats-list" id="sideStats"></ul>
+          <button type="button" class="btn btn-ghost btn-sm side-share" id="sideShare">Copy link</button>
+        </div>
+        <div class="panel side-tags" id="sideTags" hidden>
+          <h3 class="panel-subtitle">Tags</h3>
+          <div class="tag-cloud" id="sideTagCloud"></div>
+        </div>
+        <div class="panel side-related">
+          <h3 class="panel-subtitle">More in <span id="sideRelatedCat">this category</span></h3>
+          <ul class="side-related-list" id="sideRelated"></ul>
+        </div>
+      </aside>
+      </div>
+    </div>
+  </main>
+
+  <footer class="site-footer">
+    <div class="site-footer-columns">
+      <div class="site-footer-col">
+        <h3>Browse</h3>
+        <a href="/addons">Addons &amp; Mods</a>
+        <a href="/models">Models</a>
+        <a href="/servers">Servers</a>
+        <a href="/changelog">Changelog</a>
+      </div>
+      <div class="site-footer-col">
+        <h3>Create</h3>
+        <a href="/upload.html">Upload</a>
+        <a href="/creator/">Addon Creator</a>
+        <a href="/dashboard">Dashboard</a>
+      </div>
+      <div class="site-footer-col">
+        <h3>Community</h3>
+        <a href="/forum">Forum</a>
+        <a href="/feedback">Feedback</a>
+        <a href="/metrics">Metrics</a>
+        <a href="https://discord.gg/QsjZnQzEsc" target="_blank" rel="noopener noreferrer">Discord Server</a>
+        <a href="https://github.com/ashframe-org/cubyz-hub" target="_blank" rel="noopener noreferrer">Open Source</a>
+      </div>
+    </div>
+    <div class="site-footer-divider"></div>
+    <div class="site-footer-row">
+      <p class="site-footer-blurb">CubyzHub is a community-run platform for Cubyz addons and mods, not an official Cubyz service.</p>
+      <span class="site-footer-credit">Cubyz Hub &middot; by iNiKKo &copy; 2025-2026</span>
+    </div>
+  </footer>
+
+  <script src="/vendor/simplewebauthn-browser.umd.min.js"></script>
+  <script src="/vendor/marked.umd.js?v=20260919-17"></script>
+  <script src="/vendor/purify.min.js?v=20260919-17"></script>
+  <script src="/theme-toggle.js?v=20260919-17"></script>
+  <script src="/toast.js?v=20260919-17"></script>
+  <script type="module" src="/dist/auth.js?v=20260919-22"></script>
+  <script src="/forum-gallery.js?v=20260919-03"></script>
+  <script type="module" src="/forum-markdown.js?v=20260919-03"></script>
+  <script src="/forum-editor.js?v=20260919-06"></script>
+  <script src="/forum-thread.js?v=20260919-25"></script>
+</body>
+
+</html>

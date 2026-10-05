@@ -14,7 +14,7 @@ body.um-locked .um-card {
 
 .um-card {
   width: 100%;
-  max-width: 980px;
+  max-width: 1560px;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -164,6 +164,10 @@ body.um-locked .um-card {
 
 .um-paint-status-row {
   min-height: 1.1rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
 }
 
 .um-paint-status {
@@ -178,6 +182,16 @@ body.um-locked .um-card {
   opacity: 1;
 }
 
+.um-cloud-status {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  margin-left: auto;
+}
+
+.um-cloud-status.error {
+  color: #e06c75;
+}
+
 .um-paint-split {
   display: flex;
   gap: 1.25rem;
@@ -185,12 +199,12 @@ body.um-locked .um-card {
 }
 
 .um-preview-wrap {
-  flex: 0 0 34%;
+  flex: 0 0 30%;
   min-width: 0;
 }
 
 .um-preview-canvas {
-  height: 480px;
+  height: 560px;
   background: var(--bg-alt);
   border: 1px solid var(--border);
   border-radius: 8px;
@@ -217,7 +231,7 @@ body.um-locked .um-card {
 }
 
 .um-paint-area {
-  flex: 1 1 66%;
+  flex: 1 1 70%;
   min-width: 0;
   display: flex;
   flex-direction: column;
@@ -291,6 +305,17 @@ body.um-locked .um-card {
   cursor: pointer;
 }
 
+.um-inline-value {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  min-width: 2.6rem;
+  text-align: right;
+}
+
+#umOpacity {
+  width: 90px;
+}
+
 .um-grid-toggle-label input {
   cursor: pointer;
 }
@@ -312,7 +337,7 @@ body.um-locked .um-card {
 
 .um-canvas-scroll-container {
   width: 100%;
-  height: 420px;
+  height: 520px;
   overflow: auto;
   background: var(--bg);
   border: 1px solid var(--border);
@@ -336,6 +361,22 @@ body.um-locked .um-card {
 
 .um-grid-canvas {
   cursor: crosshair;
+}
+
+/* Brush footprint preview that follows the cursor. */
+.um-brush-cursor {
+  position: absolute;
+  top: 0;
+  left: 0;
+  pointer-events: none;
+  border: 1px solid rgba(255, 255, 255, 0.9);
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.65);
+  box-sizing: border-box;
+  z-index: 5;
+}
+
+.um-brush-cursor[hidden] {
+  display: none;
 }
 
 
@@ -399,4 +440,148 @@ body.um-locked .um-card {
   .um-preview-canvas {
     height: 260px;
   }
+}
+
+/* Top bar + cloud saves */
+.um-topbar {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.um-topbar-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.um-cloud-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1500;
+  background: rgba(0, 0, 0, 0.72);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+
+.um-cloud-overlay.hidden {
+  display: none;
+}
+
+.um-cloud-panel {
+  width: 100%;
+  max-width: 720px;
+  max-height: 82vh;
+  overflow-y: auto;
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 20px;
+}
+
+.um-cloud-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.um-cloud-head h2 {
+  margin: 0;
+  font-size: 1.2rem;
+}
+
+.um-cloud-close {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-size: 1.6rem;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0 6px;
+}
+
+.um-cloud-close:hover {
+  color: var(--text);
+}
+
+.um-cloud-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 12px;
+  margin-top: 14px;
+}
+
+.um-cloud-item {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--bg-alt);
+  overflow: hidden;
+  cursor: pointer;
+  text-align: left;
+  padding: 0;
+  color: var(--text);
+}
+
+.um-cloud-item:hover {
+  border-color: var(--accent);
+}
+
+.um-cloud-thumb {
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  object-fit: cover;
+  image-rendering: pixelated;
+  background: var(--bg);
+  display: block;
+}
+
+.um-cloud-item-body {
+  padding: 8px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.um-cloud-item-title {
+  font-size: 0.88rem;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.um-cloud-item-meta {
+  font-size: 0.72rem;
+  color: var(--text-muted);
+}
+
+.um-cloud-empty {
+  color: var(--text-muted);
+  font-size: 0.9rem;
+  padding: 10px 2px;
+}
+
+/* Coordinate system selector (custom full models) */
+.um-coord-row {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.5rem;
+}
+.um-coord-choices {
+  display: flex;
+  gap: 0.75rem;
+}
+.um-coord-choice {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  cursor: pointer;
+  font-size: 0.9rem;
+}
+.um-coord-choice input {
+  cursor: pointer;
 }

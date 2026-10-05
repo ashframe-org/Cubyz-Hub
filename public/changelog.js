@@ -4,6 +4,7 @@ const CHANGELOG_TRUNCATE_PX = 150;
 let isChangelogAdmin = false;
 let editingEntryId = null;
 let allChangelogEntries = [];
+let currentModalEntry = null;
 let activeChangelogFilter = "";
 
 const changelogPurifierConfig = { ADD_TAGS: ["img"], ADD_ATTR: ["src", "alt", "title"] };
@@ -109,12 +110,16 @@ function openChangelogModal(entry) {
   if (captureBtn) captureBtn.classList.toggle("hidden", !isChangelogAdmin);
   const downloadBtn = document.getElementById("changelog-modal-download-btn");
   if (downloadBtn) downloadBtn.classList.toggle("hidden", !isChangelogAdmin);
+  const previewBtn = document.getElementById("changelog-modal-preview-btn");
+  if (previewBtn) previewBtn.classList.toggle("hidden", !isChangelogAdmin);
+  currentModalEntry = entry;
   modal.classList.remove("hidden");
 }
 
 function closeChangelogModal() {
   const modal = document.getElementById("changelog-modal");
   if (modal) modal.classList.add("hidden");
+  currentModalEntry = null;
 }
 
 async function renderChangelogCaptureCanvas() {
@@ -123,6 +128,7 @@ async function renderChangelogCaptureCanvas() {
 
   const excludedIds = new Set([
     "changelog-modal-close",
+    "changelog-modal-preview-btn",
     "changelog-modal-capture-btn",
     "changelog-modal-download-btn",
     "changelog-modal-screenshots"
@@ -216,6 +222,40 @@ async function downloadChangelogModalImage() {
   }
 }
 
+async function setChangelogPreviewImage() {
+  const btn = document.getElementById("changelog-modal-preview-btn");
+  const entry = currentModalEntry;
+  if (!btn || !entry || typeof html2canvas !== "function") return;
+  const original = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = "Generating…";
+  try {
+    const canvas = await renderChangelogCaptureCanvas();
+    if (!canvas) throw new Error("capture failed");
+    const dataUrl = canvas.toDataURL("image/png");
+    const res = await fetch(`/api/admin/changelog/${entry.id}/og-image`, {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "text/plain" },
+      body: dataUrl,
+    });
+    const text = await res.text();
+    let json = null;
+    try { json = JSON.parse(text); } catch (_) {}
+    if (!res.ok || !json || !json.ok) {
+      throw new Error((json && json.error) || `Request failed (${res.status}).`);
+    }
+    entry.og_image = json.og_image;
+    if (window.toast && typeof window.toast.success === "function") window.toast.success("Link preview image set");
+    btn.textContent = "Preview set!";
+  } catch (err) {
+    console.error("Failed to set changelog preview image:", err);
+    if (window.toast && typeof window.toast.error === "function") window.toast.error(err.message || "Failed to set preview image");
+    btn.textContent = "Failed - try again";
+  }
+  setTimeout(() => { btn.textContent = original; btn.disabled = false; }, 1800);
+}
+
 function renderChangelogEntries() {
   const list = document.getElementById("changelog-list");
   const empty = document.getElementById("changelog-empty");
@@ -255,6 +295,7 @@ function renderChangelogEntries() {
           ` : ""}
           ${entry.is_draft ? '<span class="changelog-entry-draft-badge">DRAFT - only visible to you</span>' : ""}
           ${entry.tag ? `<span class="changelog-entry-tag changelog-entry-tag-${entry.tag}">${changelogTagLabel(entry.tag)}</span>` : ""}
+          <button type="button" class="changelog-link-btn btn btn-ghost btn-sm" title="Copy a shareable link to this update">Copy link</button>
           <span class="changelog-entry-date">${formatChangelogDate(entry.created_at)}</span>
         </div>
       </div>
@@ -283,6 +324,9 @@ function renderChangelogEntries() {
     bodyEl.innerHTML = renderChangelogBody(entry.body);
 
     renderScreenshotThumbs(article.querySelector(".changelog-screenshots"), entry.screenshots);
+
+    const linkBtn = article.querySelector(".changelog-link-btn");
+    if (linkBtn) linkBtn.addEventListener("click", () => copyChangelogLink(entry));
 
     requestAnimationFrame(() => {
       if (bodyEl.scrollHeight > CHANGELOG_TRUNCATE_PX + 4) {
@@ -360,6 +404,29 @@ async function publishChangelogEntry(entry) {
   }
 }
 
+function changelogShareVersion(entry) {
+  const s = entry.og_image || "";
+  let h = 0;
+  for (let i = 0; i < s.length; i++) h = (Math.imul(h, 31) + s.charCodeAt(i)) | 0;
+  return Math.abs(h).toString(36);
+}
+
+function copyChangelogLink(entry) {
+  // Include a version when a preview image is set so a re-shared entry gets a
+  // fresh Discord embed (Discord caches embeds per URL).
+  const suffix = entry.og_image ? `?v=${changelogShareVersion(entry)}` : "";
+  const url = `${location.origin}/changelog/${entry.id}${suffix}`;
+  const done = () => {
+    if (window.toast && typeof window.toast.success === "function") window.toast.success("Link copied");
+    else if (window.toast) window.toast("Link copied");
+  };
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(url).then(done, () => {});
+  } else {
+    done();
+  }
+}
+
 async function loadChangelog() {
   try {
     const res = await fetch("/api/changelog", { credentials: "include" });
@@ -367,6 +434,13 @@ async function loadChangelog() {
     if (!json.ok) return;
     allChangelogEntries = json.entries || [];
     renderChangelogEntries();
+
+    // Deep link: /changelog/<id> opens that entry.
+    const match = location.pathname.match(/^\/changelog\/(\d+)/);
+    if (match) {
+      const entry = allChangelogEntries.find((e) => String(e.id) === match[1]);
+      if (entry) openChangelogModal(entry);
+    }
 
     const latestReal = allChangelogEntries.find((entry) => !entry.is_draft);
     if (latestReal) {
@@ -629,6 +703,8 @@ function setupModal() {
   document.getElementById("changelog-modal-close").addEventListener("click", closeChangelogModal);
   document.getElementById("changelog-modal-capture-btn").addEventListener("click", captureChangelogModalImage);
   document.getElementById("changelog-modal-download-btn").addEventListener("click", downloadChangelogModalImage);
+  const previewBtn = document.getElementById("changelog-modal-preview-btn");
+  if (previewBtn) previewBtn.addEventListener("click", setChangelogPreviewImage);
   modal.addEventListener("click", (e) => {
     if (e.target === modal) closeChangelogModal();
   });
@@ -639,6 +715,9 @@ function setupModal() {
 
 window.addEventListener("DOMContentLoaded", async () => {
   await setupComposer();
+  const bodyInput = document.getElementById("changelog-body-input");
+  const bodyToolbar = document.getElementById("changelog-body-toolbar");
+  if (bodyInput && bodyToolbar && window.ForumEditor) window.ForumEditor.attach(bodyInput, bodyToolbar);
   loadChangelog();
   setupModal();
   setupChangelogImgModal();

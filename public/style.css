@@ -84,6 +84,12 @@ textarea {
     resize: vertical;
 }
 
+select option,
+select optgroup {
+    background: var(--input-bg);
+    color: var(--text);
+}
+
 main {
     flex: 1;
 }

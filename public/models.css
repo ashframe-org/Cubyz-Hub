@@ -2,8 +2,7 @@
 .blur-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(8, 8, 8, 0.45);
-  backdrop-filter: blur(6px);
+  background: rgba(8, 8, 8, 0.6);
   display: none;
   align-items: center;
   justify-content: center;
@@ -402,4 +401,125 @@
   .model-canvas-container {
     height: 150px;
   }
+}
+
+/* Official models: compact single row */
+#model-official-grid {
+  display: flex;
+  gap: 0.75rem;
+  max-width: 1180px;
+  margin: 0 auto 1.25rem;
+  padding: 0 1rem;
+  overflow-x: auto;
+}
+
+#model-official-grid .model-card {
+  flex: 1 1 0;
+  min-width: 150px;
+}
+
+#model-official-grid .model-card-header {
+  padding: 0.5rem 0.6rem 0.35rem;
+}
+
+#model-official-grid .model-card-title {
+  font-size: 0.82rem;
+}
+
+#model-official-grid .model-canvas-container {
+  height: 120px;
+}
+
+/* Viewer modal: fill the info column, tighten dimensions */
+.model-viewer-modal-box {
+  width: 820px;
+}
+
+.model-viewer-canvas {
+  height: 340px;
+}
+
+.model-viewer-meta {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 16px;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+.model-viewer-meta li {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.model-viewer-meta-label {
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-size: 0.68rem;
+  opacity: 0.75;
+}
+
+.model-viewer-description.is-empty {
+  font-style: italic;
+  color: var(--text-muted);
+  opacity: 0.8;
+}
+
+.model-viewer-remixes-empty {
+  margin: 0;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+/* Official model cards link straight into the paint station */
+.model-card-clickable {
+  cursor: pointer;
+  text-decoration: none;
+  color: inherit;
+}
+.model-card-clickable .model-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+.model-card-paint-hint {
+  font-size: 0.68rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--accent);
+  border: 1px solid var(--accent-border, var(--accent));
+  border-radius: 999px;
+  padding: 1px 8px;
+  opacity: 0.55;
+  transition: opacity 0.15s ease, background 0.15s ease, color 0.15s ease;
+}
+.model-card-clickable:hover .model-card-paint-hint {
+  opacity: 1;
+  background: var(--accent);
+  color: #111;
+}
+
+/* "Paint a model" CTA beside the filters */
+.paint-model-btn {
+  white-space: nowrap;
+}
+
+/* Coordinate-system chip (informational) */
+.model-coord-chip {
+  flex-shrink: 0;
+  font-size: 0.62rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 1px 7px;
 }

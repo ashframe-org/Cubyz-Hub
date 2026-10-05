@@ -1,5 +1,6 @@
 import sanitizeHtml from "sanitize-html";
 import { marked } from "marked";
+import { embedVideoLinks, applyImageSizes, linkMentions } from "../public/markdown-embeds.js";
 
 export function parseCreatorsJson(value) {
   let list = [];
@@ -22,9 +23,9 @@ export function parseCreatorsJson(value) {
 }
 
 export function safeMarkdown(md) {
-  const rawHtml = marked.parse(md || "");
-  return sanitizeHtml(rawHtml, {
-    allowedTags: sanitizeHtml.defaults.allowedTags.concat(["img"]),
+  const rawHtml = marked.parse(md || "", { breaks: true, gfm: true });
+  const clean = sanitizeHtml(rawHtml, {
+    allowedTags: sanitizeHtml.defaults.allowedTags.concat(["img", "del"]),
                       allowedAttributes: {
                         ...sanitizeHtml.defaults.allowedAttributes,
                         img: ["src", "alt", "title"]
@@ -32,6 +33,9 @@ export function safeMarkdown(md) {
                       allowedSchemes: ["http", "https", "data"],
                       allowedSchemesByTag: { img: ["http", "https", "data"] }
   });
+  // Video embeds are generated from an allow-list of providers *after*
+  // sanitizing, so user-supplied iframes can never get through.
+  return linkMentions(applyImageSizes(embedVideoLinks(clean)));
 }
 
 export function isSafeUrl(value) {

@@ -29,8 +29,8 @@
   <meta property="og:image" content="/assets/default_icon.png">
   <meta property="og:url" content="">
   <link rel="stylesheet" href="dist/buttons.css?v=20260919-17">
-  <link rel="stylesheet" href="dist/style.css?v=20260919-17">
-  <link rel="stylesheet" href="addon.css?v=20260919-17">
+  <link rel="stylesheet" href="dist/style.css?v=20260919-18">
+  <link rel="stylesheet" href="addon.css?v=20260919-24">
   <link rel="stylesheet" href="dist/ashframe-theme.css?v=20260919-17" />
   <style>
     body {
@@ -286,14 +286,24 @@
 
   <footer class="site-footer">
     <div class="site-footer-columns">
+            <div class="site-footer-col">
+        <h3>Browse</h3>
+        <a href="/addons">Addons &amp; Mods</a>
+        <a href="/models">Models</a>
+        <a href="/servers">Servers</a>
+        <a href="/changelog">Changelog</a>
+      </div>
       <div class="site-footer-col">
-        <h3>CubyzHub</h3>
-        <a href="/addons">Explore</a>
-        <a href="upload.html">Upload</a>
-        <a href="dashboard.html">Dashboard</a>
+        <h3>Create</h3>
+        <a href="/upload.html">Upload</a>
+        <a href="/creator/">Addon Creator</a>
+        <a href="/dashboard">Dashboard</a>
       </div>
       <div class="site-footer-col">
         <h3>Community</h3>
+        <a href="/forum">Forum</a>
+        <a href="/feedback">Feedback</a>
+        <a href="/metrics">Metrics</a>
         <a href="https://discord.gg/QsjZnQzEsc" target="_blank" rel="noopener noreferrer">
           <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor" aria-hidden="true"><path d="M20.32 4.37a19.8 19.8 0 0 0-4.9-1.52.07.07 0 0 0-.08.04c-.21.38-.45.87-.61 1.26a18.3 18.3 0 0 0-5.48 0 12.6 12.6 0 0 0-.63-1.26.08.08 0 0 0-.08-.04c-1.7.3-3.36.8-4.9 1.52a.07.07 0 0 0-.03.03C.53 8.7-.32 12.9.1 17.06a.08.08 0 0 0 .03.06 19.9 19.9 0 0 0 6 3.03.08.08 0 0 0 .08-.03c.46-.63.87-1.3 1.23-2a.08.08 0 0 0-.04-.11 13.1 13.1 0 0 1-1.87-.9.08.08 0 0 1-.01-.13c.13-.09.25-.19.37-.28a.07.07 0 0 1 .08-.01c3.93 1.79 8.18 1.79 12.06 0a.07.07 0 0 1 .08 0c.12.1.24.2.37.29a.08.08 0 0 1-.01.13c-.6.35-1.22.65-1.87.9a.08.08 0 0 0-.04.11c.36.7.78 1.37 1.23 2a.08.08 0 0 0 .08.03 19.83 19.83 0 0 0 6.01-3.03.08.08 0 0 0 .03-.06c.5-4.83-.83-9-3.53-12.66a.06.06 0 0 0-.03-.03ZM8.02 14.6c-1.18 0-2.15-1.08-2.15-2.42 0-1.33.95-2.42 2.15-2.42 1.21 0 2.17 1.1 2.15 2.42 0 1.34-.95 2.42-2.15 2.42Zm7.97 0c-1.18 0-2.15-1.08-2.15-2.42 0-1.33.95-2.42 2.15-2.42 1.21 0 2.17 1.1 2.15 2.42 0 1.34-.94 2.42-2.15 2.42Z"></path></svg>
           Discord Server
@@ -331,8 +341,9 @@
   <script src="toast.js?v=20260919-17"></script>
   <script src="vendor/marked.umd.js?v=20260919-17"></script>
   <script src="vendor/purify.min.js?v=20260919-17"></script>
-  <script src="markdown-editor.js?v=20260919-17"></script>
-  <script type="module" src="dist/auth.js?v=20260919-17"></script>
+  <script src="vendor/html2canvas.min.js"></script>
+  <script src="markdown-editor.js?v=20260919-18"></script>
+  <script type="module" src="dist/auth.js?v=20260919-22"></script>
   <script src="dist/compress.js?v=20260919-17"></script>
   <script src="dist/image-cropper.js?v=20260919-17"></script>
   <script type="module">
@@ -381,7 +392,9 @@
             .replace(/(^-|-$)/g, "");
 
           const prefix = data.addon.type === "mod" ? "/mod" : "/addon";
-          const newUrl = `${prefix}/${addonId}-${slug}`;
+          let newUrl = `${prefix}/${addonId}-${slug}`;
+          const versionParam = new URLSearchParams(window.location.search).get("version");
+          if (versionParam) newUrl += `?version=${encodeURIComponent(versionParam)}`;
 
           if (window.location.pathname !== newUrl) {
             window.history.replaceState(null, "", newUrl);
@@ -425,6 +438,90 @@
         el.title = label;
         el.setAttribute("aria-label", label);
         el.innerHTML = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><path d="M14 2v6h6"></path><path d="M9 13h6"></path><path d="M9 17h6"></path></svg>';
+      }
+
+      function setCopyLinkIcon(el, label) {
+        el.textContent = "";
+        el.title = label;
+        el.setAttribute("aria-label", label);
+        el.innerHTML = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 13a5 5 0 0 0 7.07 0l2.83-2.83a5 5 0 0 0-7.07-7.07L11 4"></path><path d="M14 11a5 5 0 0 0-7.07 0L4.1 13.83a5 5 0 0 0 7.07 7.07L13 19"></path></svg>';
+      }
+
+      // Renders the version "poster" card (title / version / game version /
+      // changelog) offscreen and returns a PNG data URL, or null on failure.
+      async function renderVersionPoster(versionId) {
+        if (typeof html2canvas !== "function") return null;
+        let data = null;
+        try {
+          const res = await fetch(`/api/version-poster/${versionId}`).then((r) => r.json());
+          if (res.ok) data = res;
+        } catch {
+          /* fall through */
+        }
+        if (!data) return null;
+
+        const card = document.createElement("div");
+        // Inline styles keep the capture self-contained (html2canvas ignores
+        // some external stylesheet rules on dynamically-built nodes).
+        card.style.cssText = [
+          "position:fixed", "left:-10000px", "top:0", "width:1200px", "box-sizing:border-box",
+          "padding:64px 72px", "background:#1e1e1e", "color:#e6e6e6", "border-left:12px solid #5BA65B",
+          "font-family:system-ui,-apple-system,'Segoe UI',Roboto,sans-serif",
+        ].join(";");
+        card.innerHTML = `
+          <div style="display:inline-block;font-size:22px;font-weight:800;letter-spacing:0.12em;color:#1a1f1c;background:#5BA65B;padding:8px 18px;border-radius:999px;margin-bottom:28px;">NEW UPDATE</div>
+          <h1 class="version-poster-title" style="margin:0 0 20px;font-size:64px;line-height:1.1;font-weight:800;color:#fff;"></h1>
+          <div style="display:flex;gap:14px;margin-bottom:32px;">
+            <span class="version-poster-version" style="font-size:24px;font-weight:600;color:#cfe9cf;background:rgba(91,166,91,0.18);border:1px solid rgba(91,166,91,0.5);padding:8px 20px;border-radius:10px;"></span>
+            <span class="version-poster-game" style="font-size:24px;font-weight:600;color:#cfe9cf;background:rgba(91,166,91,0.18);border:1px solid rgba(91,166,91,0.5);padding:8px 20px;border-radius:10px;"></span>
+          </div>
+          <div class="version-poster-body" style="font-size:28px;line-height:1.5;color:#bdbdbd;white-space:pre-wrap;max-height:340px;overflow:hidden;"></div>
+          <div class="version-poster-foot" style="margin-top:40px;padding-top:20px;border-top:1px solid #333;font-size:20px;color:#7a7a7a;letter-spacing:0.04em;">cubyzhub &middot; addons.ashframe.net</div>`;
+        card.querySelector(".version-poster-title").textContent = data.name;
+        card.querySelector(".version-poster-version").textContent = "v" + (data.version || "?");
+        card.querySelector(".version-poster-game").textContent = "Game " + (data.compatibility || "—");
+        card.querySelector(".version-poster-body").textContent = data.changelog || "Bug fixes and improvements.";
+        document.body.appendChild(card);
+        try {
+          const canvas = await html2canvas(card, { backgroundColor: "#1e1e1e", scale: 2, useCORS: true, width: 1200 });
+          return canvas.toDataURL("image/png");
+        } finally {
+          card.remove();
+        }
+      }
+
+      async function copyVersionShareLink(versionId) {
+        const url = `${location.origin}/version/${versionId}`;
+        const btn = document.activeElement;
+        const originalTitle = btn && btn.title;
+        if (btn && btn.classList) btn.classList.add("busy");
+        if (window.__addonIsOwner) {
+          try {
+            const dataUrl = await renderVersionPoster(versionId);
+            if (dataUrl) {
+              await fetch(`/api/versions/${versionId}/og-image`, {
+                method: "POST",
+                credentials: "include",
+                headers: { "Content-Type": "text/plain" },
+                body: dataUrl,
+              });
+            }
+          } catch (e) {
+            console.warn("Failed to generate version poster:", e);
+          }
+        }
+        if (btn && btn.classList) btn.classList.remove("busy");
+        if (btn && btn.setAttribute && originalTitle) btn.title = originalTitle;
+        try {
+          if (navigator.clipboard && navigator.clipboard.writeText) {
+            await navigator.clipboard.writeText(url);
+          } else {
+            throw new Error("no clipboard");
+          }
+          (toast.success || toast)("Share link copied - paste it in Discord");
+        } catch {
+          window.prompt("Copy this share link:", url);
+        }
       }
 
       const RELEASE_CHANNEL_LABELS = { release: "Release", beta: "Beta", alpha: "Alpha" };
@@ -1006,6 +1103,7 @@
         }
 
         window.__addonAuthor = author;
+        window.__addonIsOwner = !!(window.__currentUser && window.__currentUser === author);
         window.__addonCreators = parseCreators(addon.creators || []);
         window.__addonPendingInvites = addon.pendingCreatorInvites || [];
         renderAuthorRole(addon.author_role || "");
@@ -2292,6 +2390,7 @@ delBtn.onclick = async (e) => {
           function renderVersionRow(v, isActive) {
             const li = document.createElement("li");
             li.className = "version-row";
+            li.dataset.versionId = String(v.id);
 
             if (isActive) {
               li.classList.add("active-version");
@@ -2516,6 +2615,13 @@ delBtn.onclick = async (e) => {
               };
             }
             actions.appendChild(download);
+
+            const copyLink = document.createElement("button");
+            copyLink.className = "btn btn-ghost btn-sm btn-icon-only";
+            copyLink.type = "button";
+            setCopyLinkIcon(copyLink, "Copy share link");
+            copyLink.onclick = () => copyVersionShareLink(v.id);
+            actions.appendChild(copyLink);
 
             if (isOwner) {
               const delBtn = document.createElement("button");
@@ -2772,6 +2878,40 @@ delBtn.onclick = async (e) => {
 
             loadMoreBtn.onclick = renderNextBatch;
             renderFiltered();
+
+            function focusVersion(targetId) {
+              const selectTab = () => {
+                const tabs = document.querySelectorAll(".tab-content");
+                tabs.forEach((tab) => tab.classList.remove("active"));
+                document.querySelectorAll(".tab-bar button").forEach((b) => b.classList.remove("active"));
+                const versionsTabBtn = document.querySelector('.tab-bar button[data-tab="versions"]');
+                if (versionsTabBtn) versionsTabBtn.classList.add("active");
+                const target = document.getElementById("versions");
+                if (target) target.classList.add("active");
+              };
+              selectTab();
+              let guard = 0;
+              while (!vList.querySelector(`li[data-version-id="${targetId}"]`) && shown < filteredVersions.length && guard < 100) {
+                renderNextBatch();
+                guard++;
+              }
+              const row = vList.querySelector(`li[data-version-id="${targetId}"]`);
+              if (!row) return;
+              const toggle = row.querySelector(".version-changelog-toggle");
+              const body = row.querySelector(".version-changelog-body");
+              if (toggle && body && body.classList.contains("hidden")) toggle.click();
+              row.scrollIntoView({ behavior: "smooth", block: "center" });
+              row.classList.add("version-row-highlight");
+            }
+
+            let focusAttempts = 0;
+            function scheduleFocus() {
+              if (!window.__targetVersionId) return;
+              focusVersion(window.__targetVersionId);
+              if (document.querySelector('li[data-version-id="' + window.__targetVersionId + '"].version-row-highlight')) return;
+              if (focusAttempts++ < 20) setTimeout(scheduleFocus, 150);
+            }
+            scheduleFocus();
           } else {
             if (filterBar) filterBar.hidden = true;
             if (tableHeader) tableHeader.hidden = true;
@@ -2821,6 +2961,24 @@ delBtn.onclick = async (e) => {
                 const data = await res.json();
 
                 if (data.ok) {
+                  // Generate the Discord link-preview poster for the new version.
+                  try {
+                    const versions = await fetch(`/api/versions/${addonId}`).then((r) => r.json());
+                    const latest = (versions.versions || [])[0];
+                    if (latest) {
+                      const dataUrl = await renderVersionPoster(latest.id);
+                      if (dataUrl) {
+                        await fetch(`/api/versions/${latest.id}/og-image`, {
+                          method: "POST",
+                          credentials: "include",
+                          headers: { "Content-Type": "text/plain" },
+                          body: dataUrl,
+                        });
+                      }
+                    }
+                  } catch (e) {
+                    console.warn("Failed to generate version poster:", e);
+                  }
                   location.reload();
                 } else {
                   toast.error(data.error || "Upload failed.");
@@ -2996,6 +3154,7 @@ async function setupStarSystem() {
           }
         } catch {}
         window.__currentUser = currentUser;
+        window.__targetVersionId = new URLSearchParams(window.location.search).get("version");
         fetchAddon();
         fetchComments();
         fetchVersions();

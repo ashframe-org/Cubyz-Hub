@@ -79,6 +79,7 @@ function applyLoadedProject(saved) {
 window.saveCurrentProject = async function () {
   const user = await isLoggedIn();
   if (!user) {
+    if (typeof window.persistCreatorDraft === "function") window.persistCreatorDraft();
     if (confirm("You need to be signed in to save to your account. Open Cubyz Hub's login?")) {
       document.querySelector("[data-open-auth]")?.click();
     }

@@ -1,4 +1,4 @@
-@import '/dist/style.css?v=20260919-17';
+@import '/dist/style.css?v=20260919-18';
 
 
 .dash-main {
@@ -64,15 +64,9 @@
 
 
 .addon-grid {
-  display: flex;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
   gap: 12px;
-  overflow-x: auto;
-  padding-bottom: 4px;
-  scroll-snap-type: x proximity;
-}
-
-.addon-grid .user-addon-card {
-  scroll-snap-align: start;
 }
 
 .user-addon-card {
@@ -250,8 +244,7 @@
 .blur-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(8, 8, 8, 0.45);
-  backdrop-filter: blur(6px);
+  background: rgba(8, 8, 8, 0.6);
   display: none;
   align-items: center;
   justify-content: center;
@@ -541,8 +534,7 @@ select {
   border: 1px solid rgba(255, 255, 255, 0.03);
   box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4);
   overflow: hidden;
-  flex: 1;
-  min-height: 320px;
+  height: clamp(420px, 70vh, 640px);
   width: 100%;
 }
 
@@ -554,6 +546,8 @@ select {
   gap: 2px;
   background: var(--bg-alt);
   border-right: 1px solid rgba(255, 255, 255, 0.06);
+  overflow-y: auto;
+  scrollbar-width: thin;
 }
 
 .account-tab {
@@ -599,7 +593,29 @@ select {
   flex: 1;
   padding: 20px;
   min-width: 0;
+  min-height: 0;
   overflow-y: auto;
+  scrollbar-width: thin;
+}
+
+.account-panels::-webkit-scrollbar,
+.account-tabs::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+.account-panels::-webkit-scrollbar-thumb,
+.account-tabs::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.12);
+  border-radius: 999px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+
+.account-panels::-webkit-scrollbar-thumb:hover,
+.account-tabs::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.22);
+  background-clip: padding-box;
 }
 
 .account-panel {
@@ -913,6 +929,13 @@ select {
   display: flex;
   align-items: center;
   justify-content: center;
+  overflow: hidden;
+}
+
+.model-card-thumb canvas {
+  display: block;
+  width: 100% !important;
+  height: 100% !important;
 }
 
 .model-card-thumb img {
@@ -1008,4 +1031,302 @@ select {
 .model-file-row input[type="file"] {
   color: var(--text);
   max-width: 60%;
+}
+
+/* Usage panel */
+.usage-total {
+  margin: 2px 0 10px;
+  font-size: 0.95rem;
+}
+
+.usage-total strong {
+  font-size: 1.4rem;
+  color: var(--text);
+}
+
+.usage-bar {
+  display: flex;
+  height: 14px;
+  border-radius: 999px;
+  overflow: hidden;
+  background: var(--bg-alt);
+  border: 1px solid var(--border);
+}
+
+.usage-bar-seg {
+  height: 100%;
+  transition: width 0.35s ease;
+}
+
+.usage-legend {
+  list-style: none;
+  margin: 16px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.usage-legend li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 0.92rem;
+}
+
+.usage-swatch {
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+  flex: 0 0 auto;
+}
+
+.usage-legend .usage-label {
+  flex: 1 1 auto;
+  color: var(--text);
+}
+
+.usage-legend .usage-count {
+  color: var(--text-muted);
+}
+
+.usage-legend .usage-size {
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+}
+
+.usage-legend .usage-pct {
+  width: 42px;
+  text-align: right;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.usage-empty {
+  margin: 14px 0 0;
+  color: var(--text-muted);
+  font-size: 0.92rem;
+}
+
+/* Forum posts on the dashboard */
+.dash-forum-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.dash-forum-item {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 12px 14px;
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.dash-forum-link {
+  color: var(--text);
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.dash-forum-link:hover {
+  color: var(--accent);
+}
+
+.dash-forum-meta {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+}
+
+/* Dashboard content tabs (Uploads / Models / Servers / Forum) */
+.dash-content {
+  margin-bottom: 2rem;
+}
+
+.dash-content-head {
+  margin-bottom: 14px;
+}
+
+.content-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px;
+  padding: 6px;
+  margin-bottom: 18px;
+  background: var(--bg-alt);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+}
+
+.content-tab {
+  background: transparent;
+  border: none;
+  border-radius: 8px;
+  color: var(--text-muted);
+  padding: 8px 14px;
+  font: inherit;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.content-tab:hover {
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text);
+}
+
+.content-tab.active {
+  background: var(--bg);
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.content-panel {
+  display: none;
+}
+
+.content-panel.active {
+  display: block;
+}
+
+.content-actions-row {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+
+.content-filter {
+  margin-right: auto;
+  flex: 1 1 auto;
+  min-width: 0;
+  max-width: 320px;
+  height: 36px;
+  padding: 0 12px;
+  border-radius: 8px;
+  border: 1px solid var(--input-border);
+  background: var(--input-bg);
+  color: var(--text);
+  font: inherit;
+  font-size: 0.88rem;
+}
+
+.content-filter:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+/* Locked account panel on small screens: tabs become a horizontal strip so
+   the content keeps the full width while the panel height stays fixed. */
+@media (max-width: 720px) {
+  .account-settings {
+    flex-direction: column;
+  }
+
+  .account-tabs {
+    flex: 0 0 auto;
+    flex-direction: row;
+    overflow-x: auto;
+    overflow-y: hidden;
+    border-right: none;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  }
+
+  .account-tab {
+    white-space: nowrap;
+  }
+
+  .account-tab-danger {
+    margin-top: 0;
+    margin-left: auto;
+  }
+}
+
+/* Dashboard: manage-servers cards (servers.css isn't loaded here) */
+#serverManageGrid.server-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  margin: 0;
+  padding: 0;
+}
+#serverManageGrid .server-card {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  min-width: 0;
+  padding: 0.9rem 1.1rem;
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+#serverManageGrid .server-card-icon {
+  width: 52px;
+  height: 52px;
+  border-radius: 8px;
+  object-fit: cover;
+  background: var(--bg-alt);
+  border: 1px solid var(--border);
+  flex-shrink: 0;
+}
+#serverManageGrid .server-card-main {
+  min-width: 0;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+#serverManageGrid .server-card-title-row {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  min-width: 0;
+}
+#serverManageGrid .server-card-title {
+  font-weight: 700;
+  font-size: 1rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+#serverManageGrid .server-card-desc {
+  margin: 0;
+  font-size: 0.82rem;
+  color: var(--text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+#serverManageGrid .server-card-stats {
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.4rem;
+}
+#serverManageGrid .server-status-badge,
+#serverManageGrid .server-draft-badge {
+  font-size: 0.72rem;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  white-space: nowrap;
+}
+#serverManageGrid .server-status-online {
+  color: var(--accent);
+  border-color: var(--accent-border, rgba(91, 166, 91, 0.4));
+}
+#serverManageGrid .server-status-offline {
+  color: var(--text-muted);
+}
+#serverManageGrid .user-addon-actions {
+  display: flex;
+  gap: 6px;
 }

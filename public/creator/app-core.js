@@ -9,12 +9,20 @@ window.itemTexturesOnly = [];
 window.particleTexturesOnly = [];
 window.allSearchableItems = [];
 window.dropdownsGenerated = false;
-window.VERSION_PATH = "0.3.0";
+window.VERSION_PATH = "unreleased";
+
+// Game-data snapshots live beside the creator at /creator/gamedata/<version>/
+// (bind-mounted from runtime/creator-data on the host). Every version-specific
+// asset request goes through this so adding a version is just another folder.
+function gameDataUrl(rel) {
+    return `gamedata/${window.VERSION_PATH}/${rel}`;
+}
+window.gameDataUrl = gameDataUrl;
 
 const ENTITY_FOLDER_BY_VERSION = {
     "0.0.0": "entity", "0.0.1": "entity", "0.1.0": "entity", "0.1.1": "entity",
     "0.2.0": "entityModels", "0.3.0": "entityModels",
-    "unreleased": "entity_models"
+    "0.4.0": "entity_models", "unreleased": "entity_models"
 };
 function entityFolderForVersion(version) {
     return ENTITY_FOLDER_BY_VERSION[version] || "entityModels";
@@ -28,13 +36,13 @@ function versionLabel(version) {
 }
 
 function biomeClimateFieldForVersion(version) {
-    return version === "unreleased" ? "climate" : "properties";
+    return (version === "unreleased" || version === "0.4.0") ? "climate" : "properties";
 }
 
 function blockEntityRefForVersion(value, version) {
     const bare = String(value || "").split(":").pop().replace(/^\./, "");
     if (!bare) return "";
-    return (version === "unreleased" || version === "0.3.0")
+    return (version === "unreleased" || version === "0.4.0" || version === "0.3.0")
         ? `"cubyz:${bare}"`
         : `.${bare}`;
 }
@@ -64,19 +72,20 @@ window.metricCounts = { blocks: 0, items: 0, blockTex: 0, itemTex: 0, music: 0, 
 async function loadServerAssets() {
     const statusEl = document.getElementById('folderStatus');
     if (statusEl) {
-        statusEl.innerText = "Connecting to 0.3.0 database...";
+        statusEl.innerText = `Connecting to ${versionLabel(window.VERSION_PATH)} database...`;
         statusEl.className = "status-badge";
     }
 
     try {
-        const [blocksRes, itemsRes, texturesRes, recipesRes, musicRes, entitiesRes, particlesRes] = await Promise.all([
-            fetch(`${window.VERSION_PATH}/blocks.json`),
-            fetch(`${window.VERSION_PATH}/items.json`),
-            fetch(`${window.VERSION_PATH}/textures.json`),
-            fetch(`${window.VERSION_PATH}/recipes.json`).catch(() => null),
-            fetch(`${window.VERSION_PATH}/music.json`).catch(() => null),
-            fetch(`${window.VERSION_PATH}/entity_models.json`).catch(() => null),
-            fetch(`${window.VERSION_PATH}/particles.json`).catch(() => null)
+        const [blocksRes, itemsRes, texturesRes, recipesRes, musicRes, entitiesRes, particlesRes, blockTexturesRes] = await Promise.all([
+            fetch(gameDataUrl("blocks.json")),
+            fetch(gameDataUrl("items.json")),
+            fetch(gameDataUrl("textures.json")),
+            fetch(gameDataUrl("recipes.json")).catch(() => null),
+            fetch(gameDataUrl("music.json")).catch(() => null),
+            fetch(gameDataUrl("entity_models.json")).catch(() => null),
+            fetch(gameDataUrl("particles.json")).catch(() => null),
+            fetch(gameDataUrl("block_textures.json")).catch(() => null)
         ]);
 
         if (!blocksRes.ok || !itemsRes.ok || !texturesRes.ok) {
@@ -106,6 +115,19 @@ async function loadServerAssets() {
             window.serverParticles = await particlesRes.json();
         }
 
+        // Block metadata (model/rotation/transparency) used to filter the
+        // contextual search dropdowns (only flowers for flowers, etc.).
+        window.blockTextures = {};
+        if (blockTexturesRes && blockTexturesRes.ok) {
+            window.blockTextures = await blockTexturesRes.json();
+        }
+        // SBB structure list (trees etc.) for the structure preset picker.
+        window.serverSbbList = [];
+        try {
+            const sbbRes = await fetch(gameDataUrl("sbb.json"));
+            if (sbbRes.ok) window.serverSbbList = await sbbRes.json();
+        } catch (_) {}
+
         updateSearchableItems();
 
         window.blockTexturesOnly = [];
@@ -132,7 +154,7 @@ async function loadServerAssets() {
 
             const textureObject = {
                 name: shortName,
-                dataUrl: `${window.VERSION_PATH}/${fullTexturePath}.png`,
+                dataUrl: gameDataUrl(`${fullTexturePath}.png`),
                 isCustom: false,
                 isBlockType: isBlockTexture,
                 isEntityType: isEntityTexture,
@@ -189,7 +211,7 @@ window.renderMetricsUI = function() {
     <span class="metric-hidden-pill status-pill">Particles: ${window.metricCounts.particles}</span>
     ` : "";
 
-    statusEl.innerHTML = `${hiddenPills}<span class="status-pill version-active" style="margin-left: auto; cursor: pointer;">v${window.VERSION_PATH} ${window.metricsExpandedState ? '→' : '←'}</span>`;
+    statusEl.innerHTML = `${hiddenPills}<span class="status-pill version-active" style="margin-left: auto; cursor: pointer;">v${versionLabel(window.VERSION_PATH)} ${window.metricsExpandedState ? '→' : '←'}</span>`;
 };
 
 window.toggleMetricsPanel = function() {

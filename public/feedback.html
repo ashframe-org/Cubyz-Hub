@@ -1,0 +1,135 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <meta name="color-scheme" content="dark">
+  <style>html { background: #101010; }</style>
+  <script>
+    (function () {
+      try {
+        const saved = localStorage.getItem("cubyzhub-theme");
+        if (saved !== "default") document.documentElement.setAttribute("data-theme", "ashframe");
+      } catch (_) {
+        document.documentElement.setAttribute("data-theme", "ashframe");
+      }
+    })();
+  </script>
+
+  <title>Feedback &middot; Cubyz Hub</title>
+  <meta name="description" content="Send feedback, bug reports and ideas for CubyzHub.">
+  <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml">
+  <link rel="icon" href="/assets/favicon.ico" sizes="any">
+  <link rel="apple-touch-icon" href="/assets/apple-touch-icon.png">
+
+  <link rel="stylesheet" href="dist/buttons.css?v=20260919-17" />
+  <link rel="stylesheet" href="dist/style.css?v=20260919-18" />
+  <link rel="stylesheet" href="dist/ashframe-theme.css?v=20260919-17" />
+  <link rel="stylesheet" href="feedback.css?v=20260919-19" />
+</head>
+
+<body>
+  <header class="site-header">
+    <h1 class="site-title bbh-sans-hegarty-regular" onclick="location.href='/'" style="cursor:pointer;">
+      Cubyz Hub
+    </h1>
+    <div class="header-actions nav-user" id="nav-user"></div>
+    <button type="button" class="theme-toggle-btn" id="themeToggleBtn" data-theme-trigger aria-label="Toggle theme" title="Toggle theme">
+      <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <circle cx="12" cy="12" r="9"></circle>
+        <path d="M12 3a9 9 0 0 1 0 18z" fill="currentColor" stroke="none"></path>
+      </svg>
+    </button>
+  </header>
+
+  <main class="feedback-main">
+    <section class="feedback-hero">
+      <h2>Send feedback</h2>
+      <p class="muted">Found a bug, or have an idea? Tell us what to fix or improve. Every bit helps.</p>
+    </section>
+
+    <section class="panel feedback-card">
+      <div id="feedbackGuest" class="feedback-guest" hidden>
+        <p>Log in to send feedback so we can follow up if needed.</p>
+        <button type="button" class="btn btn-primary" data-open-auth>Log in</button>
+      </div>
+
+      <form id="feedbackForm" hidden>
+        <div class="feedback-row">
+          <div class="field">
+            <label for="feedbackTarget">What's it about?</label>
+            <select id="feedbackTarget">
+              <option value="addon_creator">Addon Creator</option>
+              <option value="addons_mods">Addons &amp; Mods</option>
+              <option value="forum">Forum</option>
+              <option value="models">Models</option>
+              <option value="website">Website</option>
+              <option value="other">Other</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="feedbackType">Type</label>
+            <select id="feedbackType">
+              <option value="bug">Bug</option>
+              <option value="improvement">Improvement / Idea</option>
+              <option value="other">Other</option>
+            </select>
+          </div>
+        </div>
+        <div class="field">
+          <label for="feedbackBody">Your feedback</label>
+          <textarea id="feedbackBody" maxlength="4000" rows="6" placeholder="Describe the bug or your idea..."></textarea>
+        </div>
+        <p class="field-error" id="feedbackError" hidden></p>
+        <p class="feedback-success" id="feedbackSuccess" hidden>Thanks! Your feedback was sent.</p>
+        <div class="feedback-actions">
+          <button type="submit" class="btn btn-primary" id="feedbackSubmit">Send feedback</button>
+        </div>
+      </form>
+    </section>
+
+    <section class="panel" id="feedbackAdmin" hidden>
+      <h3>Feedback inbox</h3>
+      <div id="feedbackList" class="feedback-list"></div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="site-footer-columns">
+      <div class="site-footer-col">
+        <h3>Browse</h3>
+        <a href="/addons">Addons &amp; Mods</a>
+        <a href="/models">Models</a>
+        <a href="/servers">Servers</a>
+        <a href="/changelog">Changelog</a>
+      </div>
+      <div class="site-footer-col">
+        <h3>Create</h3>
+        <a href="/upload.html">Upload</a>
+        <a href="/creator/">Addon Creator</a>
+        <a href="/dashboard">Dashboard</a>
+      </div>
+      <div class="site-footer-col">
+        <h3>Community</h3>
+        <a href="/forum">Forum</a>
+        <a href="/feedback">Feedback</a>
+        <a href="/metrics">Metrics</a>
+        <a href="https://discord.gg/QsjZnQzEsc" target="_blank" rel="noopener noreferrer">Discord Server</a>
+      </div>
+    </div>
+    <div class="site-footer-divider"></div>
+    <div class="site-footer-row">
+      <p class="site-footer-blurb">CubyzHub is a community-run platform for Cubyz addons and mods, not an official Cubyz service.</p>
+      <span class="site-footer-credit">Cubyz Hub &middot; by iNiKKo &copy; 2025-2026</span>
+    </div>
+  </footer>
+
+  <script src="vendor/simplewebauthn-browser.umd.min.js"></script>
+  <script src="theme-toggle.js?v=20260919-17"></script>
+  <script src="toast.js?v=20260919-17"></script>
+  <script type="module" src="dist/auth.js?v=20260919-22"></script>
+  <script type="module" src="feedback.js?v=20260919-18"></script>
+</body>
+
+</html>

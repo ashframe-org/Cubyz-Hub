@@ -24,8 +24,8 @@
   <link rel="icon" href="/assets/favicon.ico" sizes="any">
   <link rel="apple-touch-icon" href="/assets/apple-touch-icon.png">
   <link rel="stylesheet" href="dist/buttons.css?v=20260919-17">
-  <link rel="stylesheet" href="dashboard.css?v=20260919-17">
-  <link rel="stylesheet" href="servers.css?v=20260919-17">
+  <link rel="stylesheet" href="/dashboard.css?v=20260919-27">
+  <link rel="stylesheet" href="servers.css?v=20260919-27">
   <link rel="stylesheet" href="dist/ashframe-theme.css?v=20260919-17" />
 
 </head>
@@ -45,67 +45,6 @@
   </header>
 
   <main class="dash-main">
-    <section class="dash-hero dash-hero-toggle" id="uploadsHero" role="button" tabindex="0" aria-expanded="false" aria-controls="uploadsPanel">
-      <div>
-        <h2>Your Uploads</h2>
-        <p class="muted">Manage your uploaded addons and mods - edit, update versions or delete.</p>
-      </div>
-      <div class="hero-actions">
-        <button id="goUpload" class="btn btn-primary">Upload Addon / Mod</button>
-        <span class="dash-hero-arrow" aria-hidden="true">▾</span>
-      </div>
-    </section>
-
-    <div id="uploadsPanel" class="dash-panel hidden">
-      <section id="addonGrid" class="addon-grid"></section>
-
-      <div id="emptyState" class="empty-state hidden">
-        <h3>Nothing uploaded yet</h3>
-        <p class="muted">Upload your first addon or mod to get started.</p>
-        <button id="uploadNew" class="btn btn-primary">Upload Addon / Mod</button>
-      </div>
-    </div>
-
-    <section class="dash-hero dash-hero-toggle" id="modelsHero" role="button" tabindex="0" aria-expanded="false" aria-controls="modelsPanel">
-      <div>
-        <h2>Your Models</h2>
-        <p class="muted">Manage your uploaded Cubyz models and skins - paint a new one or delete old ones.</p>
-      </div>
-      <div class="hero-actions">
-        <a id="modelUploadLinkBtn" href="/uploadmodel.html" class="btn btn-primary">Paint a Model</a>
-        <span class="dash-hero-arrow" aria-hidden="true">▾</span>
-      </div>
-    </section>
-
-    <div id="modelsPanel" class="dash-panel hidden">
-      <section id="modelGrid" class="model-grid"></section>
-
-      <div id="modelEmptyState" class="empty-state hidden">
-        <h3>No models uploaded yet</h3>
-        <p class="muted">Paint your first model or skin to get started.</p>
-      </div>
-    </div>
-
-    <section class="dash-hero dash-hero-toggle" id="serversHero" role="button" tabindex="0" aria-expanded="false" aria-controls="serversPanel">
-      <div>
-        <h2>Your Servers</h2>
-        <p class="muted">Manage your listed Cubyz servers.</p>
-      </div>
-      <div class="hero-actions">
-        <a id="serverCreateLinkBtn" href="/server.html?new=1" class="btn btn-primary">List a Server</a>
-        <span class="dash-hero-arrow" aria-hidden="true">▾</span>
-      </div>
-    </section>
-
-    <div id="serversPanel" class="dash-panel hidden">
-      <section id="serverManageGrid" class="server-grid"></section>
-
-      <div id="serverEmptyState" class="empty-state hidden">
-        <h3>No servers listed yet</h3>
-        <p class="muted">List your first server to get started.</p>
-      </div>
-    </div>
-
     <section class="account-header">
       <h2>Account</h2>
       <p class="muted">Manage your profile, security, notifications and account.</p>
@@ -117,6 +56,7 @@
         <button type="button" class="account-tab" data-account-tab="security" role="tab" aria-selected="false">Security</button>
         <button type="button" class="account-tab" data-account-tab="notifications" role="tab" aria-selected="false">Notifications</button>
         <button type="button" class="account-tab" data-account-tab="privacy" role="tab" aria-selected="false">Privacy</button>
+        <button type="button" class="account-tab" data-account-tab="usage" role="tab" aria-selected="false">Usage</button>
         <button type="button" class="account-tab account-tab-danger" data-account-tab="danger" role="tab" aria-selected="false">Danger Zone</button>
       </nav>
 
@@ -133,7 +73,7 @@
             <label>Default Theme</label>
             <p class="field-hint">Saved to your account, so it follows you to other browsers and devices when you're logged in.</p>
             <select id="themePreference" class="privacy-select">
-              <option value="ashframe">Ashframe (red)</option>
+              <option value="ashframe">Red</option>
               <option value="default">Green</option>
             </select>
           </div>
@@ -232,6 +172,26 @@
           </div>
 
           <div class="field">
+            <label>Forum</label>
+            <label class="pref-toggle-row">
+              <input type="checkbox" class="pref-toggle" data-pref="forumReplies">
+              <span>Someone replies to my discussion</span>
+            </label>
+            <label class="pref-toggle-row">
+              <input type="checkbox" class="pref-toggle" data-pref="forumMentions">
+              <span>Someone @mentions me in a discussion</span>
+            </label>
+            <label class="pref-toggle-row">
+              <input type="checkbox" class="pref-toggle" data-pref="forumAccepted">
+              <span>My answer is accepted as the solution</span>
+            </label>
+            <label class="pref-toggle-row">
+              <input type="checkbox" class="pref-toggle" data-pref="forumVotes">
+              <span>Someone upvotes my discussion or reply</span>
+            </label>
+          </div>
+
+          <div class="field">
             <label>Site updates</label>
             <label class="pref-toggle-row">
               <input type="checkbox" class="pref-toggle" data-pref="changelogUpdates">
@@ -269,6 +229,26 @@
               <span>Show my activity status on my profile</span>
             </label>
           </div>
+
+          <div class="field">
+            <label>Forum activity</label>
+            <p class="field-hint">Controls whether the discussions you start appear on your public profile.</p>
+            <label class="pref-toggle-row">
+              <input type="checkbox" class="pref-toggle-input" id="forumVisible">
+              <span>Show my forum activity on my profile</span>
+            </label>
+          </div>
+        </div>
+
+        <div class="account-panel" id="account-panel-usage">
+          <div class="field">
+            <label>Storage usage</label>
+            <p class="field-hint">Everything you've uploaded or saved to CubyzHub, broken down by category. Only you can see this.</p>
+            <p class="usage-total"><strong id="usageTotal">&mdash;</strong> <span class="muted" id="usageTotalItems"></span></p>
+            <div class="usage-bar" id="usageBar"></div>
+            <ul class="usage-legend" id="usageLegend"></ul>
+            <p class="usage-empty" id="usageEmpty" hidden>Nothing stored yet &mdash; upload an addon, skin or server to see it here.</p>
+          </div>
         </div>
 
         <div class="account-panel" id="account-panel-danger">
@@ -290,6 +270,70 @@
         </div>
       </div>
     </section>
+    <section class="dash-content">
+      <div class="dash-content-head">
+        <div>
+          <h2>Your Content</h2>
+          <p class="muted">Manage everything you've published on CubyzHub.</p>
+        </div>
+      </div>
+
+      <nav class="content-tabs" role="tablist" aria-label="Your content">
+        <button type="button" class="content-tab active" data-content-tab="uploads" role="tab" aria-selected="true">Uploads</button>
+        <button type="button" class="content-tab" data-content-tab="models" role="tab" aria-selected="false">Models</button>
+        <button type="button" class="content-tab" data-content-tab="servers" role="tab" aria-selected="false">Servers</button>
+        <button type="button" class="content-tab" data-content-tab="forum" role="tab" aria-selected="false">Forum</button>
+      </nav>
+
+      <div class="content-panels">
+        <div class="content-panel active" id="content-panel-uploads">
+          <div class="content-actions-row">
+            <input id="uploadsFilter" class="content-filter" type="search" placeholder="Filter your uploads..." autocomplete="off">
+            <button id="goUpload" class="btn btn-primary">Upload Addon / Mod</button>
+          </div>
+          <section id="addonGrid" class="addon-grid"></section>
+          <div id="emptyState" class="empty-state hidden">
+            <h3>Nothing uploaded yet</h3>
+            <p class="muted">Upload your first addon or mod to get started.</p>
+            <button id="uploadNew" class="btn btn-primary">Upload Addon / Mod</button>
+          </div>
+        </div>
+
+        <div class="content-panel" id="content-panel-models">
+          <div class="content-actions-row">
+            <a id="modelUploadLinkBtn" href="/uploadmodel.html" class="btn btn-primary">Paint a Model</a>
+          </div>
+          <section id="modelGrid" class="model-grid"></section>
+          <div id="modelEmptyState" class="empty-state hidden">
+            <h3>No models uploaded yet</h3>
+            <p class="muted">Paint your first model or skin to get started.</p>
+          </div>
+        </div>
+
+        <div class="content-panel" id="content-panel-servers">
+          <div class="content-actions-row">
+            <a id="serverCreateLinkBtn" href="/server.html?new=1" class="btn btn-primary">List a Server</a>
+          </div>
+          <section id="serverManageGrid" class="server-grid"></section>
+          <div id="serverEmptyState" class="empty-state hidden">
+            <h3>No servers listed yet</h3>
+            <p class="muted">List your first server to get started.</p>
+          </div>
+        </div>
+
+        <div class="content-panel" id="content-panel-forum">
+          <div class="content-actions-row">
+            <a href="/forum" class="btn btn-primary">Go to Forum</a>
+          </div>
+          <ul id="forumList" class="dash-forum-list"></ul>
+          <div id="forumEmptyState" class="empty-state hidden">
+            <h3>No forum posts yet</h3>
+            <p class="muted">Start a discussion on the forum to see it here.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
   </main>
 
   <div id="deleteAccountModal" class="blur-overlay" aria-hidden="true">
@@ -326,14 +370,24 @@
   <div class="toast-area" id="toastArea"></div>
   <footer class="site-footer">
     <div class="site-footer-columns">
+            <div class="site-footer-col">
+        <h3>Browse</h3>
+        <a href="/addons">Addons &amp; Mods</a>
+        <a href="/models">Models</a>
+        <a href="/servers">Servers</a>
+        <a href="/changelog">Changelog</a>
+      </div>
       <div class="site-footer-col">
-        <h3>CubyzHub</h3>
-        <a href="/addons">Explore</a>
-        <a href="upload.html">Upload</a>
-        <a href="dashboard.html">Dashboard</a>
+        <h3>Create</h3>
+        <a href="/upload.html">Upload</a>
+        <a href="/creator/">Addon Creator</a>
+        <a href="/dashboard">Dashboard</a>
       </div>
       <div class="site-footer-col">
         <h3>Community</h3>
+        <a href="/forum">Forum</a>
+        <a href="/feedback">Feedback</a>
+        <a href="/metrics">Metrics</a>
         <a href="https://discord.gg/QsjZnQzEsc" target="_blank" rel="noopener noreferrer">
           <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor" aria-hidden="true"><path d="M20.32 4.37a19.8 19.8 0 0 0-4.9-1.52.07.07 0 0 0-.08.04c-.21.38-.45.87-.61 1.26a18.3 18.3 0 0 0-5.48 0 12.6 12.6 0 0 0-.63-1.26.08.08 0 0 0-.08-.04c-1.7.3-3.36.8-4.9 1.52a.07.07 0 0 0-.03.03C.53 8.7-.32 12.9.1 17.06a.08.08 0 0 0 .03.06 19.9 19.9 0 0 0 6 3.03.08.08 0 0 0 .08-.03c.46-.63.87-1.3 1.23-2a.08.08 0 0 0-.04-.11 13.1 13.1 0 0 1-1.87-.9.08.08 0 0 1-.01-.13c.13-.09.25-.19.37-.28a.07.07 0 0 1 .08-.01c3.93 1.79 8.18 1.79 12.06 0a.07.07 0 0 1 .08 0c.12.1.24.2.37.29a.08.08 0 0 1-.01.13c-.6.35-1.22.65-1.87.9a.08.08 0 0 0-.04.11c.36.7.78 1.37 1.23 2a.08.08 0 0 0 .08.03 19.83 19.83 0 0 0 6.01-3.03.08.08 0 0 0 .03-.06c.5-4.83-.83-9-3.53-12.66a.06.06 0 0 0-.03-.03ZM8.02 14.6c-1.18 0-2.15-1.08-2.15-2.42 0-1.33.95-2.42 2.15-2.42 1.21 0 2.17 1.1 2.15 2.42 0 1.34-.95 2.42-2.15 2.42Zm7.97 0c-1.18 0-2.15-1.08-2.15-2.42 0-1.33.95-2.42 2.15-2.42 1.21 0 2.17 1.1 2.15 2.42 0 1.34-.94 2.42-2.15 2.42Z"></path></svg>
           Discord Server
@@ -354,12 +408,15 @@
   <script src="vendor/simplewebauthn-browser.umd.min.js"></script>
   <script src="theme-toggle.js?v=20260919-17"></script>
   <script src="toast.js?v=20260919-17"></script>
+  <script src="vendor/three-r128.min.js"></script>
+  <script src="vendor/GLTFLoader-r128.js"></script>
+  <script src="model-viewer.js?v=20261004-1"></script>
   <script type="module">
     import { enhanceSelect } from './dist/custom-select.js?v=20260919-17';
     window.enhanceSelect = enhanceSelect;
   </script>
-  <script src="dist/dashboard.js?v=20260919-17"></script>
-  <script type="module" src="dist/auth.js?v=20260919-17"></script>
+  <script src="/dist/dashboard.js?v=20260919-25"></script>
+  <script type="module" src="dist/auth.js?v=20260919-22"></script>
 </body>
 
 </html>

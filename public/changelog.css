@@ -341,11 +341,11 @@
 }
 
 .changelog-modal-capture-actions {
-  position: absolute;
-  top: 10px;
-  right: 44px;
   display: flex;
+  justify-content: flex-end;
   gap: 6px;
+  margin-bottom: 0.5rem;
+  padding-right: 1.75rem;
 }
 
 .changelog-modal-capture-actions .btn {
@@ -591,3 +591,27 @@
   background: rgba(0, 0, 0, 0.7);
 }
 
+
+/* Markdown editor toolbar (shared forum editor) in the changelog composer */
+.md-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-bottom: 6px;
+}
+.md-toolbar button {
+  min-width: 30px;
+  height: 28px;
+  padding: 0 8px;
+  border: 1px solid var(--border);
+  background: var(--bg-alt);
+  color: var(--text-muted);
+  border-radius: 6px;
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.82rem;
+}
+.md-toolbar button:hover {
+  color: var(--text);
+  border-color: var(--accent-border);
+}

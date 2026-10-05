@@ -10,7 +10,8 @@
     "test": "node --test tests/utils.test.js tests/api.test.js tests/uploads.test.js tests/dist.test.js",
     "build": "npm run build:js && npm run build:css",
     "build:js": "esbuild public/auth.js public/dashboard.js public/profile.js public/load_addons.js public/addon_cards.js public/compress.js public/custom-select.js public/image-cropper.js public/changelog.js public/models.js public/uploadmodel.js public/servers.js public/server-detail.js --minify --outdir=public/dist",
-    "build:css": "esbuild public/style.css public/ashframe-theme.css public/buttons.css --minify --outdir=public/dist"
+    "build:css": "esbuild public/style.css public/ashframe-theme.css public/buttons.css --minify --outdir=public/dist",
+    "build:creator-data": "node scripts/build-creator-data.js"
   },
   "author": "Ashframe",
   "license": "AGPL-3.0-only",

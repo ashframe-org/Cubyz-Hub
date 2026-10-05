@@ -14,6 +14,14 @@ function latestReleasedVersion(rules) {
     return released[released.length - 1]?.version || "0.3.0";
 }
 
+// The version new projects should target: the `unreleased` channel when the
+// rules define one, otherwise the newest tagged release.
+function latestVersion(rules) {
+    return rules.versions.some((v) => v.version === "unreleased")
+        ? "unreleased"
+        : latestReleasedVersion(rules);
+}
+
 window.showMigrationResults = function (summary, fromVersion, toVersion, cavesMissingLayer) {
     return new Promise((resolve) => {
         const modal = document.getElementById("migrationResultsModal");
@@ -107,7 +115,7 @@ window.runMigrationAndShowResults = async function (projectData, fromVersion, to
 window.maybeOfferMigrationAfterLoad = async function (savedGameVersion) {
     try {
         const rules = await loadRulesForFlow();
-        const latest = latestReleasedVersion(rules);
+        const latest = latestVersion(rules);
         if (!savedGameVersion || savedGameVersion === latest) return;
         if (versionIdxForFlow(rules, savedGameVersion) === -1) return;
 
@@ -149,7 +157,7 @@ window.openUpdateVersionPicker = function (currentVersion) {
             return resolve(null);
         }
 
-        const latest = latestReleasedVersion(rules);
+        const latest = latestVersion(rules);
         const choices = rules.versions.filter((v) => v.released || v.version === "unreleased");
         select.innerHTML = choices.map((v) =>
             `<option value="${v.version}" ${v.version === latest ? "selected" : ""}>${versionLabel(v.version)}</option>`
@@ -165,7 +173,7 @@ window.openUpdateVersionPicker = function (currentVersion) {
 };
 
 window.startManualVersionUpdate = async function () {
-    const from = window.VERSION_PATH || "0.3.0";
+    const from = window.VERSION_PATH || "unreleased";
     const target = await window.openUpdateVersionPicker(from);
     if (!target) return;
     if (target === from) {
@@ -214,16 +222,20 @@ async function populateStartModalVersionPicker() {
     if (!select) return;
     try {
         const rules = await loadRulesForFlow();
-        const latest = latestReleasedVersion(rules);
-        select.innerHTML = `<option value="${latest}">${latest} (latest)</option>`;
+        const choices = rules.versions.filter((v) => v.released || v.version === "unreleased");
+        const latest = latestVersion(rules);
+        select.innerHTML = choices.map((v) =>
+            `<option value="${v.version}" ${v.version === latest ? "selected" : ""}>${versionLabel(v.version)}</option>`
+        ).join("");
     } catch (_) {
-        select.innerHTML = `<option value="0.3.0">0.3.0 (latest)</option>`;
+        select.innerHTML = `<option value="unreleased">0.4.0 (unreleased)</option>`;
     }
 }
 
 window.startModalChooseNew = function () {
+    if (typeof window.clearCreatorDraft === "function") window.clearCreatorDraft();
     const select = document.getElementById("startNewAddonVersion");
-    window.VERSION_PATH = select?.value || "0.3.0";
+    window.VERSION_PATH = select?.value || "unreleased";
     window.dismissStartModal();
 };
 

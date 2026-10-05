@@ -846,3 +846,214 @@
     flex-direction: column;
   }
 }
+
+/* Forum tab on the profile */
+.profile-forum-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.profile-forum-item {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 12px 14px;
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.profile-forum-link {
+  color: var(--text);
+  text-decoration: none;
+  font-weight: 600;
+  font-size: 0.95rem;
+}
+
+.profile-forum-link:hover {
+  color: var(--accent);
+}
+
+.profile-forum-meta {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+}
+
+/* Profile roles + extra stats + servers tab */
+.profile-role-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 0.68rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--accent);
+  background: var(--accent-soft, rgba(91, 166, 91, 0.15));
+  border: 1px solid var(--accent-border, rgba(91, 166, 91, 0.4));
+}
+
+.profile-stat-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.profile-stat-list li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 0.86rem;
+  color: var(--text-muted);
+}
+
+.profile-stat-list strong {
+  color: var(--text);
+}
+
+.profile-server-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.profile-server-item {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 12px 14px;
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.profile-server-link {
+  color: var(--text);
+  text-decoration: none;
+  font-weight: 600;
+  font-size: 0.95rem;
+}
+
+.profile-server-link:hover {
+  color: var(--accent);
+}
+
+.profile-server-meta {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+}
+
+.profile-server-desc {
+  margin: 2px 0 0;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  line-height: 1.4;
+}
+
+/* Tab count badges */
+.tab-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 6px;
+  margin-left: 6px;
+  border-radius: 999px;
+  background: var(--bg-alt);
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+  font-size: 0.7rem;
+  font-weight: 700;
+}
+
+.profile-tab-bar .tab-bar-btn.active .tab-count {
+  color: var(--accent);
+  border-color: var(--accent-border, rgba(91, 166, 91, 0.4));
+}
+
+/* 3D model previews on the profile */
+.profile-model-container .model-canvas-container {
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  background: var(--bg-alt);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.profile-model-container .model-canvas-container canvas {
+  display: block;
+  width: 100% !important;
+  height: 100% !important;
+}
+
+.profile-model-container .model-canvas-container img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* Server rows with icon */
+.profile-server-item {
+  flex-direction: row;
+  align-items: center;
+  gap: 12px;
+}
+
+.profile-server-icon {
+  width: 44px;
+  height: 44px;
+  border-radius: 8px;
+  object-fit: cover;
+  background: var(--bg-alt);
+  flex-shrink: 0;
+}
+
+.profile-server-info {
+  min-width: 0;
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+/* Achievements / badges (space reserved for a future feature) */
+.profile-badge-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.profile-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px;
+  border-radius: 999px;
+  background: var(--bg-alt);
+  border: 1px solid var(--border);
+  color: var(--text);
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+
+.profile-badge-row:not(:empty) + .profile-achievements-empty {
+  display: none;
+}
+
+.profile-achievements-empty {
+  margin: 0;
+  font-size: 0.85rem;
+}

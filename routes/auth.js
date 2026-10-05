@@ -13,6 +13,7 @@ import { RP_NAME, RP_ID, RP_ORIGIN } from "../config.js";
 import { uploadAvatar, uploadBanner, verifyFiles, promoteStableUpload } from "../services/uploads.js";
 import { deleteUserAccountData } from "../services/account.js";
 import { regenerateSession, destroyUserSessions } from "../services/sessions.js";
+import { recordMetric, recordActive } from "../services/metrics.js";
 import {
   isLoginLocked,
   recordLoginFailure,
@@ -52,6 +53,12 @@ router.post("/api/auth/register", async (req, res) => {
   }
   if (String(password).length < 8)
     return res.json({ ok: false, error: "Password must be at least 8 characters." });
+  if (String(password).length > 200)
+    return res.json({ ok: false, error: "Password must be 200 characters or fewer." });
+  if (securityQuestion && String(securityQuestion).length > 200)
+    return res.json({ ok: false, error: "Security question must be 200 characters or fewer." });
+  if (securityAnswer && String(securityAnswer).length > 200)
+    return res.json({ ok: false, error: "Security answer must be 200 characters or fewer." });
   try {
     const hashed = await bcrypt.hash(password, 10);
 
@@ -85,6 +92,7 @@ router.post("/api/auth/register", async (req, res) => {
 
     const response = { ok: true };
     if (plaintextRecoveryCode) response.recoveryCode = plaintextRecoveryCode;
+    recordMetric("new_users");
     res.json(response);
   } catch (err) {
     if (err.message.includes("UNIQUE"))
@@ -114,6 +122,8 @@ router.post("/api/auth/login", async (req, res) => {
     }
     clearLoginFailures(throttleKey);
     await regenerateSession(req, user);
+    recordMetric("logins");
+    recordActive(req.session.user.id);
     res.json({ ok: true, user: req.session.user });
   } catch (err) {
     console.error(err);
@@ -171,6 +181,11 @@ router.post("/api/auth/passkey/register-verify", async (req, res) => {
 
     if (!verification.verified || !verification.registrationInfo) {
       return res.json({ ok: false, error: "Passkey verification failed." });
+    }
+
+    const passkeyCount = await db.get("SELECT COUNT(*) AS n FROM passkeys WHERE user_id = ?", [req.session.user.id]);
+    if (passkeyCount.n >= 10) {
+      return res.status(400).json({ ok: false, error: "Passkey limit reached (10 per account)." });
     }
 
     const { credential } = verification.registrationInfo;
@@ -278,6 +293,8 @@ router.post("/api/auth/passkey/login-verify", async (req, res) => {
 
     clearLoginFailures(throttleKey);
     await regenerateSession(req, user);
+    recordMetric("logins");
+    recordActive(req.session.user.id);
     res.json({ ok: true, user: req.session.user });
   } catch (err) {
     console.error("Passkey login-verify error:", err);
@@ -327,6 +344,9 @@ router.post("/api/auth/change-password", async (req, res) => {
     }
     if (String(newPassword).length < 8) {
       return res.json({ ok: false, error: "Password must be at least 8 characters." });
+    }
+    if (String(newPassword).length > 200) {
+      return res.json({ ok: false, error: "Password must be 200 characters or fewer." });
     }
     const user = await db.get("SELECT * FROM users WHERE username = ?", username);
     if (!user) return res.json({ ok: false, error: "User not found" });
@@ -448,6 +468,8 @@ router.post("/api/auth/recover-password", async (req, res) => {
     return res.json({ ok: false, error: "Missing fields." });
   if (String(newPassword).length < 8)
     return res.json({ ok: false, error: "Password must be at least 8 characters." });
+  if (String(newPassword).length > 200)
+    return res.json({ ok: false, error: "Password must be 200 characters or fewer." });
   if (!securityAnswer && !recoveryCode)
     return res.json({ ok: false, error: "Provide a security answer or recovery code." });
 
